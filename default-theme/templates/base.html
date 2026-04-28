@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block page_title %}{{ title }}{% endblock page_title %} — {{ site_title }}</title>
+    <link rel="stylesheet" href="/static/css/theme.css">
+</head>
+
+<body>
+    <nav class="site-nav">
+        <a href="/" class="nav-brand">{{ site_title }}</a>
+        <ul>
+            <li><a href="/">Blog</a></li>
+            <li><a href="/wiki/">Wiki</a></li>
+            {% for p in nav_pages %}
+            <li><a href="{{ p.url | safe }}">{{ p.title }}</a></li>
+            {% endfor %}
+        </ul>
+    </nav>
+
+    <main class="content">
+        {% block content %}{% endblock content %}
+    </main>
+
+    <footer class="site-footer">
+        <p>Built with <a href="https://github.com/LHelge/aphid">aphid</a></p>
+    </footer>
+</body>
+
+</html>

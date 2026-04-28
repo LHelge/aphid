@@ -1,0 +1,3 @@
+name = "aphid-docs"
+version = "0.1.0"
+description = "Documentation theme for the aphid static site generator."

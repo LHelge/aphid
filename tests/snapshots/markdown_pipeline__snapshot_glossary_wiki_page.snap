@@ -1,0 +1,6 @@
+---
+source: tests/markdown_pipeline.rs
+assertion_line: 94
+expression: rendered.html
+---
+<p>See <a href="/blog/hello/" class="wikilink">the first post</a> for context.</p>

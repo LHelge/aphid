@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block page_title %}{{ title }} — {{ site_title }}{% endblock page_title %}
+
+{% block content %}
+<div class="wiki-layout wiki-layout-page">
+  <nav class="wiki-sidebar">
+    {% for category in wiki_categories %}
+    <div class="wiki-cat">
+      <div class="wiki-cat-name">{% if category.name %}{{ category.name }}{% else %}Other{% endif %}</div>
+      {% for page in category.pages %}
+      <a href="{{ page.url }}" class="wiki-cat-link{% if page.url == url %} active{% endif %}">{{ page.title }}</a>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </nav>
+
+  <article class="wiki-main">
+    <h1 class="wiki-title">{{ title }}</h1>
+
+    <div class="prose">
+      {{ content | safe }}
+    </div>
+
+    {% if backlinks | length > 0 %}
+    <div class="backlinks">
+      <div class="backlinks-label">Linked from</div>
+      <ul class="backlinks-list">
+        {% for link in backlinks %}
+        <li><a href="{{ link.url }}">{{ link.title }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </article>
+
+  {% if toc | length > 0 %}
+  <aside class="toc-sidebar">
+    <div class="toc-label">On this page</div>
+    {% for entry in toc %}
+    <a href="#{{ entry.id }}" class="toc-entry toc-h{{ entry.level }}">{{ entry.text }}</a>
+    {% endfor %}
+  </aside>
+  {% endif %}
+</div>
+{% endblock content %}

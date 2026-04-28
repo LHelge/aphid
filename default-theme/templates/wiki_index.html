@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block page_title %}Wiki{% endblock page_title %}
+
+{% block content %}
+<h1>Wiki</h1>
+{% for category in categories %}
+{% if category.name %}
+<h2>{{ category.name }}</h2>
+{% else %}
+<h2>Uncategorized</h2>
+{% endif %}
+<ul class="wiki-list">
+    {% for page in category.pages %}
+    <li><a href="{{ page.url | safe }}">{{ page.title }}</a></li>
+    {% endfor %}
+</ul>
+{% endfor %}
+{% endblock content %}

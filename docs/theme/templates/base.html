@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block page_title %}{{ site_title }}{% endblock page_title %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="/" class="nav-logo">
+        <span class="logo-name">{{ site_title }}</span>
+        <span class="logo-version">v{{ version }}</span>
+      </a>
+
+      <nav class="nav-desktop">
+        <a href="/wiki/" class="nav-link">Docs</a>
+        <a href="/blog/" class="nav-link">Blog</a>
+        {% for p in nav_pages %}
+        <a href="{{ p.url }}" class="nav-link">{{ p.title }}</a>
+        {% endfor %}
+        <div class="nav-sep"></div>
+        <a href="https://github.com/LHelge/aphid" class="nav-github" target="_blank" rel="noopener">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path
+              d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
+          </svg>
+          GitHub
+        </a>
+      </nav>
+
+      <button class="nav-mobile-btn" id="mobile-menu-btn" aria-label="Toggle menu" aria-expanded="false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round">
+          <line x1="4" y1="7" x2="20" y2="7" />
+          <line x1="4" y1="12" x2="20" y2="12" />
+          <line x1="4" y1="17" x2="20" y2="17" />
+        </svg>
+      </button>
+    </div>
+
+    <nav class="nav-mobile" id="mobile-menu" hidden>
+      <a href="/wiki/" class="nav-mobile-link">Docs</a>
+      <a href="/blog/" class="nav-mobile-link">Blog</a>
+      {% for p in nav_pages %}
+      <a href="{{ p.url }}" class="nav-mobile-link">{{ p.title }}</a>
+      {% endfor %}
+    </nav>
+  </header>
+
+  <main>
+    {% block content %}{% endblock content %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <span class="footer-brand">{{ site_title }} — built with aphid</span>
+      <div class="footer-links">
+        {% for s in socials %}
+        <a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.platform }}</a>
+        {% endfor %}
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const btn = document.getElementById('mobile-menu-btn');
+    const menu = document.getElementById('mobile-menu');
+    btn.addEventListener('click', () => {
+      const open = !menu.hidden;
+      menu.hidden = open;
+      btn.setAttribute('aria-expanded', String(!open));
+    });
+  </script>
+</body>
+
+</html>

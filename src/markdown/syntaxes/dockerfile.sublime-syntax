@@ -1,0 +1,193 @@
+%YAML 1.2
+---
+# Dockerfile — sublime-syntax v1 (syntect-compatible)
+name: Dockerfile
+file_extensions: [Dockerfile, dockerfile]
+first_line_match: '^(?i:FROM)\s'
+scope: source.dockerfile
+
+contexts:
+  main:
+    - include: comments
+    - include: instructions
+
+  comments:
+    - match: '^\s*#'
+      scope: punctuation.definition.comment.dockerfile
+      push: comment-body
+
+  comment-body:
+    - meta_scope: comment.line.number-sign.dockerfile
+    - match: '$'
+      pop: true
+
+  instructions:
+    - match: '(?i)^\s*(FROM)\b'
+      captures:
+        1: keyword.control.dockerfile
+      push: from-instruction
+    - match: '(?i)^\s*(RUN|CMD|ENTRYPOINT|SHELL)\b'
+      captures:
+        1: keyword.control.dockerfile
+      push: shell-instruction
+    - match: '(?i)^\s*(COPY|ADD)\b'
+      captures:
+        1: keyword.control.dockerfile
+      push: copy-instruction
+    - match: '(?i)^\s*(ENV)\b'
+      captures:
+        1: keyword.control.dockerfile
+      push: env-instruction
+    - match: '(?i)^\s*(ARG)\b'
+      captures:
+        1: keyword.control.dockerfile
+      push: arg-instruction
+    - match: '(?i)^\s*(EXPOSE)\b'
+      captures:
+        1: keyword.control.dockerfile
+      push: expose-instruction
+    - match: '(?i)^\s*(LABEL|MAINTAINER)\b'
+      captures:
+        1: keyword.control.dockerfile
+      push: label-instruction
+    - match: '(?i)^\s*(WORKDIR|USER|VOLUME|STOPSIGNAL|HEALTHCHECK|ONBUILD)\b'
+      captures:
+        1: keyword.control.dockerfile
+      push: generic-value
+
+  from-instruction:
+    - match: '(--platform=)(\S+)'
+      captures:
+        1: keyword.operator.dockerfile
+        2: string.unquoted.dockerfile
+    - match: '\b(AS)\b'
+      scope: keyword.control.dockerfile
+    - match: '(\S+)'
+      scope: entity.name.type.dockerfile
+    - match: '$'
+      pop: true
+    - include: line-continuation
+
+  shell-instruction:
+    - include: strings
+    - include: variables
+    - include: json-array
+    - match: '$'
+      pop: true
+    - include: line-continuation
+
+  copy-instruction:
+    - match: '(--from=)(\S+)'
+      captures:
+        1: keyword.operator.dockerfile
+        2: entity.name.type.dockerfile
+    - match: '(--chown=|--chmod=|--link)(\S+)?'
+      captures:
+        1: keyword.operator.dockerfile
+        2: string.unquoted.dockerfile
+    - include: strings
+    - include: variables
+    - match: '$'
+      pop: true
+    - include: line-continuation
+
+  env-instruction:
+    - match: '([A-Za-z_]\w*)(=)'
+      captures:
+        1: variable.other.dockerfile
+        2: keyword.operator.assignment.dockerfile
+    - include: strings
+    - include: variables
+    - match: '$'
+      pop: true
+    - include: line-continuation
+
+  arg-instruction:
+    - match: '([A-Za-z_]\w*)(=)?'
+      captures:
+        1: variable.other.dockerfile
+        2: keyword.operator.assignment.dockerfile
+    - include: strings
+    - include: variables
+    - match: '$'
+      pop: true
+    - include: line-continuation
+
+  expose-instruction:
+    - match: '\d+'
+      scope: constant.numeric.dockerfile
+    - match: '/(tcp|udp)'
+      scope: constant.other.dockerfile
+    - include: variables
+    - match: '$'
+      pop: true
+    - include: line-continuation
+
+  label-instruction:
+    - match: '([A-Za-z_][\w.-]*)(=)'
+      captures:
+        1: entity.name.tag.dockerfile
+        2: keyword.operator.assignment.dockerfile
+    - include: strings
+    - include: variables
+    - match: '$'
+      pop: true
+    - include: line-continuation
+
+  generic-value:
+    - include: strings
+    - include: variables
+    - match: '$'
+      pop: true
+    - include: line-continuation
+
+  strings:
+    - match: '"'
+      scope: punctuation.definition.string.begin.dockerfile
+      push: double-string
+    - match: "'"
+      scope: punctuation.definition.string.begin.dockerfile
+      push: single-string
+
+  double-string:
+    - meta_scope: string.quoted.double.dockerfile
+    - match: '\\.'
+      scope: constant.character.escape.dockerfile
+    - include: variables
+    - match: '"'
+      scope: punctuation.definition.string.end.dockerfile
+      pop: true
+
+  single-string:
+    - meta_scope: string.quoted.single.dockerfile
+    - match: "'"
+      scope: punctuation.definition.string.end.dockerfile
+      pop: true
+
+  variables:
+    - match: '(\$\{)(\w+)(\})'
+      captures:
+        1: punctuation.definition.variable.begin.dockerfile
+        2: variable.other.dockerfile
+        3: punctuation.definition.variable.end.dockerfile
+    - match: '(\$)(\w+)'
+      captures:
+        1: punctuation.definition.variable.dockerfile
+        2: variable.other.dockerfile
+
+  json-array:
+    - match: '\['
+      scope: punctuation.section.brackets.begin.dockerfile
+      push: json-array-body
+
+  json-array-body:
+    - match: '\]'
+      scope: punctuation.section.brackets.end.dockerfile
+      pop: true
+    - include: strings
+    - match: ','
+      scope: punctuation.separator.dockerfile
+
+  line-continuation:
+    - match: '\\$'
+      scope: punctuation.separator.continuation.dockerfile

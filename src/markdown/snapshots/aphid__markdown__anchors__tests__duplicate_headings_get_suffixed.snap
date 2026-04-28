@@ -1,0 +1,6 @@
+---
+source: src/markdown/anchors.rs
+assertion_line: 107
+expression: html
+---
+<h3 id="intro">Intro</h3><h3 id="intro-2">Intro</h3>

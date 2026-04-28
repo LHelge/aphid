@@ -1,0 +1,6 @@
+---
+source: src/markdown/anchors.rs
+assertion_line: 130
+expression: html
+---
+<h2 id="title">Title</h2><h3 id="section">Section</h3><h4 id="sub">Sub</h4>

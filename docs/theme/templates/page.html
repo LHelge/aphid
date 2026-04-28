@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block page_title %}{{ title }} — {{ site_title }}{% endblock page_title %}
+
+{% block content %}
+<div class="standalone-page">
+  <div class="prose">
+    {{ content | safe }}
+  </div>
+</div>
+{% endblock content %}

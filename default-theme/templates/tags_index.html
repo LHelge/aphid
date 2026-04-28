@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block page_title %}Tags{% endblock page_title %}
+
+{% block content %}
+<h1>Tags</h1>
+<ul class="tag-index">
+    {% for entry in tags %}
+    <li><a href="/tags/{{ entry.slug }}/">{{ entry.name }}</a> ({{ entry.count }})</li>
+    {% endfor %}
+</ul>
+{% endblock content %}

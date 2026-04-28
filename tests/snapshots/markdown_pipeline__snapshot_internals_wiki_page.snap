@@ -1,0 +1,7 @@
+---
+source: tests/markdown_pipeline.rs
+assertion_line: 101
+expression: rendered.html
+---
+<h2 id="section">Section</h2><pre class="code-block"><code><span class="hl-text hl-plain">some plain text
+</span></code></pre>

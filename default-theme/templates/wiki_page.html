@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+<article class="wiki-page">
+    <h1>{{ title }}</h1>
+
+    <div class="wiki-layout">
+        {% if toc | length > 0 %}
+        <aside class="toc">
+            <h2>Contents</h2>
+            <ul>
+                {% for entry in toc %}
+                <li class="toc-h{{ entry.level }}"><a href="#{{ entry.id }}">{{ entry.text }}</a></li>
+                {% endfor %}
+            </ul>
+        </aside>
+        {% endif %}
+
+        <div class="wiki-body">
+            {{ content | safe }}
+        </div>
+    </div>
+
+    {% if backlinks | length > 0 %}
+    <section class="backlinks">
+        <h2>Pages that link here</h2>
+        <ul>
+            {% for link in backlinks %}
+            <li><a href="{{ link.url | safe }}">{{ link.title }}</a></li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+</article>
+{% endblock content %}

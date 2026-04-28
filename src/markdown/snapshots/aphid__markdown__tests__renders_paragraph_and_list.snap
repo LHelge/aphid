@@ -1,0 +1,10 @@
+---
+source: src/markdown/mod.rs
+assertion_line: 75
+expression: rendered.html
+---
+<p>Hello world.</p>
+<ul>
+<li>item one</li>
+<li>item two</li>
+</ul>

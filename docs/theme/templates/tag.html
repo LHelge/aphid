@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block page_title %}#{{ tag }} — {{ site_title }}{% endblock page_title %}
+
+{% block content %}
+<div class="tag-page">
+  <h1 class="tag-heading">Posts tagged <span>#{{ tag }}</span></h1>
+  {% for post in posts %}
+  <a href="{{ post.url }}" class="post-row">
+    <div class="post-row-left">
+      <span class="post-row-title">{{ post.title }}</span>
+    </div>
+    {% if post.created %}
+    <span class="post-row-date">{{ post.created }}</span>
+    {% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% endblock content %}

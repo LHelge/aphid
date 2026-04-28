@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block page_title %}{{ title }} — {{ site_title }}{% endblock page_title %}
+
+{% block content %}
+<div class="post-page">
+  <div class="breadcrumb">
+    <a href="/">Home</a>
+    <span class="breadcrumb-sep">/</span>
+    <a href="/blog/">Blog</a>
+    <span class="breadcrumb-sep">/</span>
+    <span>{{ title }}</span>
+  </div>
+
+  <div class="post-grid">
+    <article>
+      <header class="post-header">
+        {% if tags | length > 0 %}
+        <div class="post-tags">
+          {% for tag in tags %}
+          <a href="/tags/{{ tag.slug }}/" class="tag-badge">{{ tag.name }}</a>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <h1 class="post-title">{{ title }}</h1>
+        <div class="post-meta">
+          {% if created %}<span>{{ created }}</span>{% endif %}
+          {% if author %}
+          <span class="post-meta-sep">·</span>
+          <span>{{ author }}</span>
+          {% endif %}
+          {% if updated %}
+          <span class="post-meta-sep">·</span>
+          <span>Updated {{ updated }}</span>
+          {% endif %}
+        </div>
+      </header>
+
+      {% if image %}
+      <img src="{{ image }}" alt="" class="post-hero">
+      {% endif %}
+
+      <div class="prose">
+        {{ content | safe }}
+      </div>
+
+      {% if backlinks | length > 0 %}
+      <div class="backlinks">
+        <div class="backlinks-label">Linked from</div>
+        <ul class="backlinks-list">
+          {% for link in backlinks %}
+          <li><a href="{{ link.url }}">{{ link.title }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </article>
+
+    {% if toc | length > 0 %}
+    <aside class="toc-sidebar">
+      <div class="toc-label">On this page</div>
+      {% for entry in toc %}
+      <a href="#{{ entry.id }}" class="toc-entry toc-h{{ entry.level }}">{{ entry.text }}</a>
+      {% endfor %}
+    </aside>
+    {% endif %}
+  </div>
+</div>
+{% endblock content %}

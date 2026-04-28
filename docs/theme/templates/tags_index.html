@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block page_title %}Tags — {{ site_title }}{% endblock page_title %}
+
+{% block content %}
+<div class="tags-page">
+  <h1 class="page-heading">Tags</h1>
+  <p class="page-subheading">Browse all content by tag.</p>
+  <div class="tags-grid">
+    {% for entry in tags %}
+    <a href="/tags/{{ entry.slug }}/" class="tag-card">
+      <span class="tag-card-name">#{{ entry.name }}</span>
+      <span class="tag-card-count">{{ entry.count }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock content %}

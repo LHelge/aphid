@@ -1,0 +1,23 @@
+---
+source: tests/build_e2e.rs
+assertion_line: 56
+expression: extract_main(&html)
+---
+<main class="content">
+        
+<h1>Posts tagged #rust</h1>
+<ul class="blog-list">
+    
+    <li>
+        <a href="/blog/second-post/">Second Post</a>
+        <time>2024-06-01</time>
+    </li>
+    
+    <li>
+        <a href="/blog/first-post/">First Post</a>
+        <time>2024-01-01</time>
+    </li>
+    
+</ul>
+
+    </main>

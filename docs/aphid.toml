@@ -1,0 +1,19 @@
+title = "aphid"
+base_url = "https://aphid.lhelge.se"
+source_dir = "content"
+static_dir = "static"
+theme_dir = "theme"
+
+wiki_categories = ["Getting Started", "Content", "Customization", "Development"]
+
+[[authors]]
+name = "LHelge"
+email = "lhelge@lhelge.se"
+
+[[socials]]
+platform = "GitHub"
+url = "https://github.com/LHelge/aphid"
+
+[[socials]]
+platform = "crates.io"
+url = "https://crates.io/crates/aphid"

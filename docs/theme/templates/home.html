@@ -1,0 +1,116 @@
+{% extends "base.html" %} {% block page_title %}{{ site_title }}{% endblock
+page_title %} {% block content %}
+<section class="home-hero">
+    <div class="hero-label">static site generator</div>
+    <h1 class="hero-title">Build docs that stay <em>fresh</em></h1>
+    <p class="hero-desc">
+        aphid is a fast, opinionated static site generator with first-class
+        support for blogs, wikis, and documentation — all from Markdown.
+    </p>
+    <div class="hero-actions">
+        <a href="/wiki/installation" class="btn-primary">Get Started →</a>
+        <div class="install-cmd">
+            <span class="install-cmd-prompt">$</span>
+            <code class="install-cmd-text" id="install-cmd-text">cargo install aphid --locked</code>
+            <button type="button" class="install-cmd-copy" id="install-cmd-copy"
+                aria-label="Copy install command to clipboard" data-copy-target="install-cmd-text">
+                <svg class="icon-copy" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+                <svg class="icon-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                </svg>
+            </button>
+        </div>
+    </div>
+</section>
+
+<script>
+    (() => {
+        const btn = document.getElementById('install-cmd-copy');
+        if (!btn) return;
+        const target = document.getElementById(btn.dataset.copyTarget);
+        if (!target) return;
+        let resetTimer;
+        btn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(target.textContent.trim());
+                btn.classList.add('copied');
+                btn.setAttribute('aria-label', 'Copied to clipboard');
+                clearTimeout(resetTimer);
+                resetTimer = setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.setAttribute('aria-label', 'Copy install command to clipboard');
+                }, 1500);
+            } catch (_) {
+                // Clipboard API unavailable (e.g. insecure context); leave the
+                // command visible so the user can select it manually.
+            }
+        });
+    })();
+</script>
+
+<div class="feature-strip">
+    <div class="feature-strip-inner">
+        <div class="feature-item">
+            <div class="feature-title">Blog + Wiki</div>
+            <div class="feature-desc">
+                First-class content types with distinct layouts and navigation
+            </div>
+        </div>
+        <div class="feature-item">
+            <div class="feature-title">[[Wiki Links]]</div>
+            <div class="feature-desc">
+                Cross-link any page by filename stem — resolves across blog,
+                wiki, and pages
+            </div>
+        </div>
+        <div class="feature-item">
+            <div class="feature-title">Themes</div>
+            <div class="feature-desc">
+                Swap the entire look with a single config change
+            </div>
+        </div>
+        <div class="feature-item">
+            <div class="feature-title">Markdown</div>
+            <div class="feature-desc">
+                Frontmatter, TOC generation, and syntax highlighting built in
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if home %}
+<section class="home-content prose">
+    {{ home.content | safe }}
+</section>
+{% endif %}
+
+<div class="blog-section">
+    <div class="blog-section-header">
+        <h2 class="section-title">Latest from the blog</h2>
+        <a href="/blog/" class="section-more">All posts →</a>
+    </div>
+    {% for post in posts | slice(end=3) %}
+    <a href="{{ post.url }}" class="post-card{% if not post.image %} post-card-no-image{% endif %}">
+        {% if post.image %}
+        <img src="{{ post.image }}" alt="" class="post-card-image">
+        {% endif %}
+        <div class="post-card-content">
+            <div class="post-card-meta">
+                {% for tag in post.tags %}
+                <span class="tag-badge">{{ tag.name }}</span>
+                {% endfor %}
+                {% if post.created %}<span class="post-card-date">{{ post.created }}</span>{% endif %}
+            </div>
+            <h3 class="post-card-title">{{ post.title }}</h3>
+            {% if post.description %}<p class="post-card-excerpt">{{ post.description }}</p>{% endif %}
+            <div class="post-card-readmore">Read post →</div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% endblock content %}

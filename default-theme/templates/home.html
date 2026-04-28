@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block page_title %}{{ site_title }}{% endblock page_title %}
+
+{% block content %}
+<h1>{{ site_title }}</h1>
+<ul class="blog-list">
+    {% for post in posts %}
+    <li>
+        <a href="{{ post.url | safe }}">{{ post.title }}</a>
+        {% if post.created %}<time>{{ post.created }}</time>{% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% endblock content %}

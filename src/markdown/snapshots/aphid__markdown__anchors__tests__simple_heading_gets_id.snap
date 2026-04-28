@@ -1,0 +1,7 @@
+---
+source: src/markdown/anchors.rs
+assertion_line: 97
+expression: html
+---
+<h3 id="hello-world">Hello World</h3>
+<p>Some text.</p>

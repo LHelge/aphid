@@ -1,0 +1,6 @@
+---
+source: src/markdown/anchors.rs
+assertion_line: 144
+expression: html
+---
+<h6 id="deep">Deep</h6><h6 id="deepest">Deepest</h6>
