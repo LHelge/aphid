@@ -15,6 +15,7 @@ use crate::config::Config;
 use crate::content::slug::Slug;
 use crate::content::{PageAny, Site};
 use crate::generated::{FaviconSet, Robots, Sitemap};
+use crate::html::insert_before_closing_tag;
 use crate::markdown::{MarkdownRenderer, Rendered};
 
 /// In-memory representation of the rendered site.
@@ -318,9 +319,7 @@ fn inject_into_head(pages: &mut HashMap<String, String>, tags: &str) {
 
 /// Inject `tags` before the first `</head>` in a single HTML string.
 fn inject_into_head_single(html: &mut String, tags: &str) {
-    if let Some(pos) = html.find("</head>") {
-        html.insert_str(pos, tags);
-    }
+    insert_before_closing_tag(html, "</head>", tags);
 }
 
 #[cfg(test)]
