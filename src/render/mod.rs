@@ -12,7 +12,6 @@ use tera::Context;
 
 use crate::Error;
 use crate::config::Config;
-use crate::content::slug::Slug;
 use crate::content::{PageAny, Site};
 use crate::generated::{FaviconSet, Robots, Sitemap};
 use crate::html::insert_before_closing_tag;
@@ -147,14 +146,13 @@ impl<'a> Renderer<'a> {
 
     fn render_markdown(site: &Site) -> RenderedPages {
         let md = MarkdownRenderer::new(site);
-        // Blog and wiki are typically the bulk of a site; render them
-        // concurrently. Standalone pages are usually one or two — sequential
-        // afterwards is fine.
+        // Page-body rendering preserves slice order, so blog/wiki/pages can
+        // all render in parallel without disturbing page-to-render alignment.
         let (blog, wiki) = rayon::join(
-            || site.blog.par_iter().map(|p| md.render(&p.body)).collect(),
-            || site.wiki.par_iter().map(|p| md.render(&p.body)).collect(),
+            || Self::render_page_bodies(&site.blog, &md),
+            || Self::render_page_bodies(&site.wiki, &md),
         );
-        let pages = site.pages.iter().map(|p| md.render(&p.body)).collect();
+        let pages = Self::render_page_bodies(&site.pages, &md);
         let home = site.home.as_ref().map(|page| md.render(&page.body));
         RenderedPages {
             blog,
@@ -162,6 +160,13 @@ impl<'a> Renderer<'a> {
             pages,
             home,
         }
+    }
+
+    fn render_page_bodies<F: Sync>(
+        pages: &[crate::content::page::Page<F>],
+        md: &MarkdownRenderer<'_>,
+    ) -> Vec<Rendered> {
+        pages.par_iter().map(|page| md.render(&page.body)).collect()
     }
 
     fn check_broken_links(rendered: &RenderedPages, site: &Site, fail: bool) -> Result<(), Error> {
@@ -224,13 +229,11 @@ impl<'a> Renderer<'a> {
         let mut all_tags: Vec<TagEntry> = Vec::new();
 
         for (tag, slugs) in &site.tag_index {
-            let posts: Vec<PostEntry> = slugs
-                .iter()
-                .filter_map(|s| site.get(s).map(|any| PostEntry::from_page(&any)))
-                .collect();
+            let posts = PostEntry::from_pages(slugs.iter().filter_map(|slug| site.get(slug)));
 
-            let tag_slug: Slug = tag.as_str().into();
-            all_tags.push(TagEntry::new(tag, posts.len()));
+            let tag_entry = TagEntry::new(tag, posts.len());
+            let tag_slug = tag_entry.slug.clone();
+            all_tags.push(tag_entry);
 
             let ctx = TagPageContext {
                 site: site_ctx.clone(),
@@ -262,11 +265,7 @@ impl<'a> Renderer<'a> {
         let mut pages = HashMap::new();
         let wiki_categories = WikiCategory::from_site(site);
 
-        let posts: Vec<PostEntry> = site
-            .blog
-            .iter()
-            .map(|p| PostEntry::from_page(&PageAny::Blog(p)))
-            .collect();
+        let posts = PostEntry::from_pages(site.blog.iter().map(PageAny::Blog));
 
         let home_content = site.home.as_ref().map(|_| {
             let rendered = rendered

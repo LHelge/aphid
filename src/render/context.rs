@@ -56,6 +56,12 @@ impl From<&HeadingEntry> for TocEntry {
     }
 }
 
+impl TocEntry {
+    fn from_headings(headings: &[HeadingEntry]) -> Vec<Self> {
+        headings.iter().map(Self::from).collect()
+    }
+}
+
 /// A backlink entry exposed to templates.
 #[derive(Debug, Clone, Serialize)]
 pub struct BacklinkEntry {
@@ -88,6 +94,12 @@ impl From<&str> for TagRef {
     }
 }
 
+impl TagRef {
+    fn from_tags(tags: &[String]) -> Vec<Self> {
+        tags.iter().map(|tag| Self::from(tag.as_str())).collect()
+    }
+}
+
 /// A blog post summary for index/tag listing pages.
 #[derive(Debug, Clone, Serialize)]
 pub struct PostEntry {
@@ -110,12 +122,15 @@ impl PostEntry {
             created: any.created(),
             image: any.image().map(String::from),
             description: any.description().map(String::from),
-            tags: any
-                .tags()
-                .iter()
-                .map(|tag| TagRef::from(tag.as_str()))
-                .collect(),
+            tags: TagRef::from_tags(any.tags()),
         }
+    }
+
+    pub fn from_pages<'a>(pages: impl IntoIterator<Item = PageAny<'a>>) -> Vec<Self> {
+        pages
+            .into_iter()
+            .map(|page| Self::from_page(&page))
+            .collect()
     }
 }
 
@@ -184,6 +199,21 @@ enum WikiCategoryOrder {
     Uncategorized,
 }
 
+impl WikiCategoryOrder {
+    fn from_name(name: Option<&str>, configured_order: &[String]) -> Self {
+        match name {
+            Some(name) => match configured_order
+                .iter()
+                .position(|configured| configured == name)
+            {
+                Some(index) => Self::Configured(index),
+                None => Self::Alphabetical(name.to_owned()),
+            },
+            None => Self::Uncategorized,
+        }
+    }
+}
+
 impl WikiCategory {
     /// Group every wiki page in `site` by category. Pages within each
     /// category are sorted by title. Categories listed in
@@ -205,12 +235,8 @@ impl WikiCategory {
             .map(|(name, pages)| Self { name, pages })
             .collect();
         let order = &site.config.wiki_categories;
-        categories.sort_by_cached_key(|category| match category.name.as_deref() {
-            Some(name) => match order.iter().position(|configured| configured == name) {
-                Some(index) => WikiCategoryOrder::Configured(index),
-                None => WikiCategoryOrder::Alphabetical(name.to_owned()),
-            },
-            None => WikiCategoryOrder::Uncategorized,
+        categories.sort_by_cached_key(|category| {
+            WikiCategoryOrder::from_name(category.name.as_deref(), order)
         });
         categories
     }
@@ -330,7 +356,7 @@ impl PageContext {
             url: page.url_path(),
             kind: page.kind(),
             content: rendered.html.clone(),
-            toc: rendered.toc.iter().map(TocEntry::from).collect(),
+            toc: TocEntry::from_headings(&rendered.toc),
             backlinks: site
                 .backlinks_for(page.slug())
                 .iter()
@@ -346,11 +372,7 @@ impl PageContext {
             description: page.description().map(String::from),
             created: page.created(),
             updated: page.updated(),
-            tags: page
-                .tags()
-                .iter()
-                .map(|tag| TagRef::from(tag.as_str()))
-                .collect(),
+            tags: TagRef::from_tags(page.tags()),
         }
     }
 
