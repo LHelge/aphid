@@ -133,7 +133,7 @@ impl<'a> Renderer<'a> {
 
         root_files.push((
             "robots.txt".into(),
-            Robots::new(&config.base_url).into_bytes(),
+            Robots::new(config.normalized_base_url()).into_bytes(),
         ));
         root_files.push(("sitemap.xml".into(), Sitemap::new(site).into_bytes()));
 

@@ -166,17 +166,7 @@ async fn handle_page(State(state): State<Arc<AppState>>, req: axum::extract::Req
     // Root files (favicon.ico, robots.txt, sitemap.xml, etc.)
     let filename = path.trim_start_matches('/');
     if let Some((_, content)) = site.root_files.iter().find(|(name, _)| name == filename) {
-        let content_type = match std::path::Path::new(filename)
-            .extension()
-            .and_then(|e| e.to_str())
-        {
-            Some("ico") => "image/x-icon",
-            Some("png") => "image/png",
-            Some("xml") => "application/xml",
-            Some("txt") => "text/plain; charset=utf-8",
-            Some("webmanifest") => "application/manifest+json",
-            _ => "application/octet-stream",
-        };
+        let content_type = root_file_content_type(filename);
         return ([(header::CONTENT_TYPE, content_type)], content.clone()).into_response();
     }
 
@@ -190,9 +180,55 @@ async fn handle_page(State(state): State<Arc<AppState>>, req: axum::extract::Req
     }
 }
 
+fn root_file_content_type(filename: &str) -> &'static str {
+    match Path::new(filename)
+        .extension()
+        .and_then(|extension| extension.to_str())
+    {
+        Some("ico") => "image/x-icon",
+        Some("png") => "image/png",
+        Some("xml") => "application/xml",
+        Some("txt") => "text/plain; charset=utf-8",
+        Some("webmanifest") => "application/manifest+json",
+        _ => "application/octet-stream",
+    }
+}
+
 async fn shutdown_signal() {
     match tokio::signal::ctrl_c().await {
         Ok(()) => tracing::info!("received ctrl-c, shutting down"),
         Err(e) => tracing::error!("failed to install ctrl-c handler: {e}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::root_file_content_type;
+
+    #[test]
+    fn root_file_content_type_handles_known_extensions() {
+        assert_eq!(root_file_content_type("favicon.ico"), "image/x-icon");
+        assert_eq!(root_file_content_type("favicon-32x32.png"), "image/png");
+        assert_eq!(root_file_content_type("sitemap.xml"), "application/xml");
+        assert_eq!(
+            root_file_content_type("robots.txt"),
+            "text/plain; charset=utf-8"
+        );
+        assert_eq!(
+            root_file_content_type("site.webmanifest"),
+            "application/manifest+json"
+        );
+    }
+
+    #[test]
+    fn root_file_content_type_falls_back_for_unknown_extensions() {
+        assert_eq!(
+            root_file_content_type("feed.unknown"),
+            "application/octet-stream"
+        );
+        assert_eq!(
+            root_file_content_type("LICENSE"),
+            "application/octet-stream"
+        );
     }
 }

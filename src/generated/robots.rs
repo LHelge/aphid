@@ -1,3 +1,5 @@
+use crate::config::Config;
+
 /// A generated `robots.txt` that allows all crawlers and references the
 /// sitemap.
 pub struct Robots {
@@ -8,9 +10,9 @@ impl Robots {
     /// Build a permissive `robots.txt` pointing at the sitemap.
     pub fn new(base_url: &str) -> Self {
         tracing::debug!("generating robots.txt");
-        let base = base_url.trim_end_matches('/');
+        let base_url = Config::normalize_base_url(base_url);
         Self {
-            content: format!("User-agent: *\nAllow: /\n\nSitemap: {base}/sitemap.xml\n"),
+            content: format!("User-agent: *\nAllow: /\n\nSitemap: {base_url}/sitemap.xml\n"),
         }
     }
 
