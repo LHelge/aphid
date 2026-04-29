@@ -1,6 +1,6 @@
 use pulldown_cmark::{Event, LinkType, Tag, TagEnd};
 
-use super::html_escape;
+use crate::html::escape_html;
 
 /// Rewrite `http://` and `https://` markdown links to open in a new tab
 /// with `rel="noopener noreferrer"`. Wiki-links are left alone — they're
@@ -22,11 +22,11 @@ pub fn rewrite_external_links(events: Vec<Event<'_>>) -> Vec<Event<'_>> {
                 let title_attr = if title.is_empty() {
                     String::new()
                 } else {
-                    format!(" title=\"{}\"", html_escape(&title))
+                    format!(" title=\"{}\"", escape_html(&title))
                 };
                 let html = format!(
                     "<a href=\"{}\"{} target=\"_blank\" rel=\"noopener noreferrer\">",
-                    html_escape(&dest_url),
+                    escape_html(&dest_url),
                     title_attr
                 );
                 out.push(Event::InlineHtml(html.into()));

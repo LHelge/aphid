@@ -14,13 +14,6 @@ use pulldown_cmark::{Options, Parser, html};
 
 use crate::content::Site;
 
-pub(crate) fn html_escape(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-}
-
 pub(crate) fn render_html(events: Vec<pulldown_cmark::Event<'_>>) -> String {
     let mut output = String::new();
     html::push_html(&mut output, events.into_iter());

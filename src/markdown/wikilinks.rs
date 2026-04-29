@@ -1,7 +1,7 @@
 use pulldown_cmark::{Event, LinkType, Options, Parser, Tag, TagEnd};
 
-use super::html_escape;
 use crate::content::{Site, Slug};
+use crate::html::escape_html;
 
 /// A `[[wiki-link]]` parsed out of a markdown body. `display` is `Some`
 /// only for pipe-aliased links (`[[slug|Display Text]]`) — when the
@@ -104,7 +104,7 @@ pub fn rewrite_wiki_links<'a>(
                     format!(
                         "<a href=\"{}\" class=\"wikilink\">{}</a>",
                         url,
-                        html_escape(&text)
+                        escape_html(&text)
                     )
                 }
                 None => {
@@ -112,7 +112,7 @@ pub fn rewrite_wiki_links<'a>(
                     broken.push(target);
                     format!(
                         "<span class=\"wikilink broken\">{}</span>",
-                        html_escape(&text)
+                        escape_html(&text)
                     )
                 }
             };
