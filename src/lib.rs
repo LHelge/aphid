@@ -32,6 +32,7 @@
 pub mod config;
 pub mod content;
 mod error;
+pub mod generated;
 pub mod markdown;
 pub mod output;
 pub mod render;

@@ -14,6 +14,7 @@ use crate::Error;
 use crate::config::Config;
 use crate::content::slug::Slug;
 use crate::content::{PageAny, Site};
+use crate::generated::{FaviconSet, Robots, Sitemap};
 use crate::markdown::{MarkdownRenderer, Rendered};
 
 /// In-memory representation of the rendered site.
@@ -22,6 +23,9 @@ pub struct RenderedSite {
     pub pages: HashMap<String, String>,
     /// Pre-rendered 404 page HTML.
     pub not_found_html: String,
+    /// Files written at the site root (e.g. `favicon.ico`, `robots.txt`,
+    /// `sitemap.xml`). Each entry is `(filename, bytes)`.
+    pub root_files: Vec<(String, Vec<u8>)>,
 }
 
 impl RenderedSite {
@@ -35,9 +39,28 @@ impl RenderedSite {
         theme: &Theme,
         fail_on_broken_links: bool,
     ) -> Result<Self, Error> {
+        let favicon = config
+            .favicon
+            .as_ref()
+            .map(|p| FaviconSet::generate(p, &config.title))
+            .transpose()?;
+        Self::build_with_favicon(config, theme, fail_on_broken_links, favicon)
+    }
+
+    /// Like [`build`](Self::build) but accepts a pre-built [`FaviconSet`].
+    ///
+    /// Serve-mode rebuilds pass the cached set from the initial render so
+    /// the expensive image-processing step is not repeated on every file
+    /// change.
+    pub fn build_with_favicon(
+        config: &Config,
+        theme: &Theme,
+        fail_on_broken_links: bool,
+        favicon: Option<FaviconSet>,
+    ) -> Result<Self, Error> {
         tracing::info!(source = %config.source_dir.display(), "loading content");
         let site = Site::load(config.clone())?;
-        Renderer::new(theme).render_all(&site, fail_on_broken_links)
+        Renderer::new(theme).render_all(&site, config, fail_on_broken_links, favicon)
     }
 
     /// Look up rendered HTML for a URL path, normalising trailing slashes.
@@ -70,10 +93,12 @@ impl<'a> Renderer<'a> {
     }
 
     /// Render the entire site: markdown pass, broken-link policy, template rendering.
-    pub fn render_all(
+    fn render_all(
         &self,
         site: &Site,
+        config: &Config,
         fail_on_broken_links: bool,
+        favicon: Option<FaviconSet>,
     ) -> Result<RenderedSite, Error> {
         tracing::info!("rendering markdown");
         let rendered = Self::render_markdown(site);
@@ -84,12 +109,28 @@ impl<'a> Renderer<'a> {
         pages.extend(self.render_tag_pages(site, &site_ctx)?);
         pages.extend(self.render_index_pages(site, &site_ctx)?);
 
-        let not_found_html =
+        let mut not_found_html =
             self.render_template("404.html", &NotFoundContext { site: site_ctx })?;
+
+        // ── Root files (favicon, robots.txt, sitemap.xml) ───────────────
+        let mut root_files: Vec<(String, Vec<u8>)> = Vec::new();
+
+        if let Some(set) = favicon {
+            root_files.extend(set.files.clone());
+            inject_into_head(&mut pages, &set.html_tags);
+            inject_into_head_single(&mut not_found_html, &set.html_tags);
+        }
+
+        root_files.push((
+            "robots.txt".into(),
+            Robots::new(&config.base_url).into_bytes(),
+        ));
+        root_files.push(("sitemap.xml".into(), Sitemap::new(site).into_bytes()));
 
         Ok(RenderedSite {
             pages,
             not_found_html,
+            root_files,
         })
     }
 
@@ -249,6 +290,20 @@ impl<'a> Renderer<'a> {
         let tera_ctx = Context::from_serialize(ctx)?;
         let html = self.theme.tera.render(template, &tera_ctx)?;
         Ok(html)
+    }
+}
+
+/// Inject `tags` before `</head>` in every page's HTML.
+fn inject_into_head(pages: &mut HashMap<String, String>, tags: &str) {
+    for html in pages.values_mut() {
+        inject_into_head_single(html, tags);
+    }
+}
+
+/// Inject `tags` before the first `</head>` in a single HTML string.
+fn inject_into_head_single(html: &mut String, tags: &str) {
+    if let Some(pos) = html.find("</head>") {
+        html.insert_str(pos, tags);
     }
 }
 

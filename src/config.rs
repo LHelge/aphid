@@ -41,6 +41,9 @@ pub struct Config {
     /// last.
     #[serde(default)]
     pub wiki_categories: Vec<String>,
+    /// Path to a source image (PNG, JPEG, SVG, etc.) used to generate
+    /// favicons at standard sizes.
+    pub favicon: Option<PathBuf>,
 }
 
 impl std::str::FromStr for Config {
@@ -79,6 +82,9 @@ impl Config {
         resolve(&mut self.static_dir);
         if let Some(ref mut d) = self.theme_dir {
             resolve(d);
+        }
+        if let Some(ref mut f) = self.favicon {
+            resolve(f);
         }
     }
 }

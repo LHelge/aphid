@@ -67,6 +67,9 @@ impl OutputWriter {
         }
         self.write_404(&site.not_found_html)?;
 
+        tracing::info!("writing root files");
+        self.write_root_files(&site.root_files)?;
+
         tracing::info!("copying static files");
         self.copy_static(theme, user_static)?;
         Ok(())
@@ -102,6 +105,16 @@ impl OutputWriter {
     fn write_404(&self, html: &str) -> Result<(), Error> {
         let dest = self.dir.join("404.html");
         fs::write(&dest, html)?;
+        Ok(())
+    }
+
+    /// Write generated root files (favicon variants, robots.txt, sitemap.xml)
+    /// directly into the output directory.
+    fn write_root_files(&self, files: &[(String, Vec<u8>)]) -> Result<(), Error> {
+        for (name, bytes) in files {
+            let dest = self.dir.join(name);
+            fs::write(&dest, bytes)?;
+        }
         Ok(())
     }
 
