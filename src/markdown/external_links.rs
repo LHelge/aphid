@@ -50,14 +50,12 @@ fn is_external(url: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pulldown_cmark::{Options, Parser, html};
+    use pulldown_cmark::{Options, Parser};
 
     fn render(input: &str) -> String {
         let events: Vec<_> = Parser::new_ext(input, Options::ENABLE_WIKILINKS).collect();
         let events = rewrite_external_links(events);
-        let mut output = String::new();
-        html::push_html(&mut output, events.into_iter());
-        output
+        crate::markdown::render_html(events)
     }
 
     #[test]

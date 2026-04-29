@@ -86,16 +86,14 @@ fn unique_id(base: &str, used: &mut HashMap<String, usize>) -> String {
 #[cfg(test)]
 mod tests {
     use insta::assert_snapshot;
-    use pulldown_cmark::{Options, Parser, html};
+    use pulldown_cmark::{Options, Parser};
 
     use super::*;
 
     fn render_with_anchors(input: &str) -> (String, Vec<HeadingEntry>) {
         let events: Vec<_> = Parser::new_ext(input, Options::empty()).collect();
         let (events, toc) = inject_heading_ids(events);
-        let mut output = String::new();
-        html::push_html(&mut output, events.into_iter());
-        (output, toc)
+        (crate::markdown::render_html(events), toc)
     }
 
     #[test]
