@@ -58,6 +58,65 @@ pub struct Site {
     pub backlinks: HashMap<Slug, Vec<Slug>>,
 }
 
+struct SitePages<'a> {
+    blog: &'a [Page<BlogFrontmatter>],
+    wiki: &'a [Page<WikiFrontmatter>],
+    pages: &'a [Page<PageFrontmatter>],
+}
+
+impl<'a> SitePages<'a> {
+    fn new(
+        blog: &'a [Page<BlogFrontmatter>],
+        wiki: &'a [Page<WikiFrontmatter>],
+        pages: &'a [Page<PageFrontmatter>],
+    ) -> Self {
+        Self { blog, wiki, pages }
+    }
+
+    fn iter_entries(self) -> impl Iterator<Item = (PageKind, usize, &'a Slug, &'a Path)> {
+        self.blog
+            .iter()
+            .enumerate()
+            .map(|(index, page)| (PageKind::Blog, index, &page.slug, page.path.as_path()))
+            .chain(
+                self.wiki
+                    .iter()
+                    .enumerate()
+                    .map(|(index, page)| (PageKind::Wiki, index, &page.slug, page.path.as_path())),
+            )
+            .chain(
+                self.pages
+                    .iter()
+                    .enumerate()
+                    .map(|(index, page)| (PageKind::Page, index, &page.slug, page.path.as_path())),
+            )
+    }
+
+    fn iter_sources(self) -> impl Iterator<Item = (&'a Slug, &'a str)> {
+        self.blog
+            .iter()
+            .map(|page| (&page.slug, page.body.as_str()))
+            .chain(
+                self.wiki
+                    .iter()
+                    .map(|page| (&page.slug, page.body.as_str())),
+            )
+            .chain(
+                self.pages
+                    .iter()
+                    .map(|page| (&page.slug, page.body.as_str())),
+            )
+    }
+
+    fn iter_any(self) -> impl Iterator<Item = PageAny<'a>> {
+        self.blog
+            .iter()
+            .map(PageAny::Blog)
+            .chain(self.wiki.iter().map(PageAny::Wiki))
+            .chain(self.pages.iter().map(PageAny::Page))
+    }
+}
+
 fn check_collision(slug: &Slug, path: &Path, seen: &HashMap<Slug, PathBuf>) -> Result<(), Error> {
     if let Some(existing) = seen.get(slug) {
         return Err(Error::SlugCollision {
@@ -163,27 +222,12 @@ impl Site {
     ) -> Result<HashMap<Slug, (PageKind, usize)>, Error> {
         let mut slug_index: HashMap<Slug, (PageKind, usize)> = HashMap::new();
         let mut slug_paths: HashMap<Slug, PathBuf> = HashMap::new();
+        let site_pages = SitePages::new(blog, wiki, pages);
 
-        let entries = blog
-            .iter()
-            .enumerate()
-            .map(|(i, p)| (PageKind::Blog, i, &p.slug, &p.path))
-            .chain(
-                wiki.iter()
-                    .enumerate()
-                    .map(|(i, p)| (PageKind::Wiki, i, &p.slug, &p.path)),
-            )
-            .chain(
-                pages
-                    .iter()
-                    .enumerate()
-                    .map(|(i, p)| (PageKind::Page, i, &p.slug, &p.path)),
-            );
-
-        for (kind, i, slug, path) in entries {
+        for (kind, index, slug, path) in site_pages.iter_entries() {
             check_collision(slug, path, &slug_paths)?;
-            slug_index.insert(slug.clone(), (kind, i));
-            slug_paths.insert(slug.clone(), path.clone());
+            slug_index.insert(slug.clone(), (kind, index));
+            slug_paths.insert(slug.clone(), path.to_path_buf());
         }
 
         Ok(slug_index)
@@ -221,13 +265,9 @@ impl Site {
         slug_index: &HashMap<Slug, (PageKind, usize)>,
     ) -> HashMap<Slug, Vec<Slug>> {
         let mut backlinks: HashMap<Slug, Vec<Slug>> = HashMap::new();
-        let sources = blog
-            .iter()
-            .map(|p| (&p.slug, p.body.as_str()))
-            .chain(wiki.iter().map(|p| (&p.slug, p.body.as_str())))
-            .chain(pages.iter().map(|p| (&p.slug, p.body.as_str())));
+        let site_pages = SitePages::new(blog, wiki, pages);
 
-        for (from_slug, body) in sources {
+        for (from_slug, body) in site_pages.iter_sources() {
             let unique_targets: HashSet<Slug> = extract_wiki_links(body)
                 .into_iter()
                 .map(|link| link.target.into())
@@ -247,6 +287,10 @@ impl Site {
             (PageKind::Wiki, idx) => Some(PageAny::Wiki(&self.wiki[*idx])),
             (PageKind::Page, idx) => Some(PageAny::Page(&self.pages[*idx])),
         }
+    }
+
+    pub fn iter_pages(&self) -> impl Iterator<Item = PageAny<'_>> {
+        SitePages::new(&self.blog, &self.wiki, &self.pages).iter_any()
     }
 
     pub fn backlinks_for(&self, slug: &Slug) -> Vec<PageAny<'_>> {

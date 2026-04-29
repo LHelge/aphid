@@ -20,9 +20,8 @@ fn extract_main(html: &str) -> &str {
 /// Build a site from the shared fixtures into a tempdir and return the
 /// (tempdir, output_dir) so assertions can inspect the result.
 async fn build_fixture_site() -> (TempDir, PathBuf) {
-    let (dir, config_path) = common::setup_with_shared_fixtures();
+    let (dir, config_path) = common::setup_with_shared_fixtures_and_style();
     let output = dir.path().join("dist");
-    write_file(&dir.path().join("static/style.css"), "body { margin: 0; }");
 
     aphid::build(&config_path, &output).await.unwrap();
     (dir, output)

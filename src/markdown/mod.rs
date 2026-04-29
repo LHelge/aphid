@@ -21,6 +21,18 @@ pub(crate) fn html_escape(text: &str) -> String {
         .replace('"', "&quot;")
 }
 
+fn markdown_options() -> Options {
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_TABLES);
+    options.insert(Options::ENABLE_FOOTNOTES);
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TASKLISTS);
+    options.insert(Options::ENABLE_WIKILINKS);
+    options.insert(Options::ENABLE_GFM);
+    options.insert(Options::ENABLE_SMART_PUNCTUATION);
+    options
+}
+
 /// The output of rendering one markdown body.
 pub struct Rendered {
     /// Body HTML, ready to be wrapped in a Tera template.
@@ -53,16 +65,7 @@ impl<'a> MarkdownRenderer<'a> {
     /// frontmatter stripped — `frontmatter::parse` does this at load time, so
     /// the `Page.body` invariant satisfies it.
     pub fn render(&self, body: &str) -> Rendered {
-        let mut opts = Options::empty();
-        opts.insert(Options::ENABLE_TABLES);
-        opts.insert(Options::ENABLE_FOOTNOTES);
-        opts.insert(Options::ENABLE_STRIKETHROUGH);
-        opts.insert(Options::ENABLE_TASKLISTS);
-        opts.insert(Options::ENABLE_WIKILINKS);
-        opts.insert(Options::ENABLE_GFM);
-        opts.insert(Options::ENABLE_SMART_PUNCTUATION);
-
-        let events: Vec<_> = Parser::new_ext(body, opts).collect();
+        let events: Vec<_> = Parser::new_ext(body, markdown_options()).collect();
 
         let (events, broken_wiki_links) = rewrite_wiki_links(events, self.site);
         let events = rewrite_external_links(events);
