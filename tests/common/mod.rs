@@ -45,3 +45,11 @@ pub fn setup_with_shared_fixtures() -> (TempDir, PathBuf) {
     let config_path = write_fixture_config(dir.path(), &fixtures_dir());
     (dir, config_path)
 }
+
+/// Like [`setup_with_shared_fixtures`] but also writes the shared static
+/// stylesheet used by integration tests that exercise asset copying/serving.
+pub fn setup_with_shared_fixtures_and_style() -> (TempDir, PathBuf) {
+    let (dir, config_path) = setup_with_shared_fixtures();
+    write_file(&dir.path().join("static/style.css"), "body { margin: 0; }");
+    (dir, config_path)
+}

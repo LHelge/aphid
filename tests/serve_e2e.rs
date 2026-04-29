@@ -8,9 +8,7 @@ mod common;
 
 /// Build a fixture site in a tempdir, return (tempdir, config_path).
 fn setup_fixture() -> (TempDir, std::path::PathBuf) {
-    let (dir, config_path) = common::setup_with_shared_fixtures();
-    write_file(&dir.path().join("static/style.css"), "body { margin: 0; }");
-    (dir, config_path)
+    common::setup_with_shared_fixtures_and_style()
 }
 
 #[tokio::test]

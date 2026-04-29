@@ -98,7 +98,11 @@ impl PostEntry {
             created: any.created(),
             image: any.image().map(String::from),
             description: any.description().map(String::from),
-            tags: any.tags().iter().map(|tag| TagRef::from(tag.as_str())).collect(),
+            tags: any
+                .tags()
+                .iter()
+                .map(|tag| TagRef::from(tag.as_str()))
+                .collect(),
         }
     }
 }
@@ -144,6 +148,13 @@ pub struct WikiCategory {
     pub pages: Vec<WikiEntry>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum WikiCategoryOrder {
+    Configured(usize),
+    Alphabetical(String),
+    Uncategorized,
+}
+
 impl WikiCategory {
     /// Group every wiki page in `site` by category. Pages within each
     /// category are sorted by title. Categories listed in
@@ -168,12 +179,12 @@ impl WikiCategory {
             .map(|(name, pages)| Self { name, pages })
             .collect();
         let order = &site.config.wiki_categories;
-        categories.sort_by_cached_key(|c| match &c.name {
-            Some(name) => match order.iter().position(|x| x == name) {
-                Some(idx) => (0u8, idx, String::new()),
-                None => (1u8, 0, name.clone()),
+        categories.sort_by_cached_key(|category| match category.name.as_deref() {
+            Some(name) => match order.iter().position(|configured| configured == name) {
+                Some(index) => WikiCategoryOrder::Configured(index),
+                None => WikiCategoryOrder::Alphabetical(name.to_owned()),
             },
-            None => (2u8, 0, String::new()),
+            None => WikiCategoryOrder::Uncategorized,
         });
         categories
     }

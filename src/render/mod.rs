@@ -80,6 +80,15 @@ struct RenderedPages {
     home: Option<Rendered>,
 }
 
+impl RenderedPages {
+    fn iter_pages(&self) -> impl Iterator<Item = &Rendered> {
+        self.blog
+            .iter()
+            .chain(self.wiki.iter())
+            .chain(self.pages.iter())
+    }
+}
+
 /// Pass-2 orchestrator: takes a [`Site`] and a [`Theme`] and produces a
 /// fully-rendered [`RenderedSite`]. Internally runs the markdown pipeline
 /// per page (in parallel via rayon), then per-page Tera template
@@ -156,16 +165,13 @@ impl<'a> Renderer<'a> {
 
     fn check_broken_links(rendered: &RenderedPages, site: &Site, fail: bool) -> Result<(), Error> {
         let all_broken = site
-            .blog
-            .iter()
-            .map(|p| &p.slug)
-            .zip(&rendered.blog)
-            .chain(site.wiki.iter().map(|p| &p.slug).zip(&rendered.wiki))
-            .chain(site.pages.iter().map(|p| &p.slug).zip(&rendered.pages))
-            .flat_map(|(slug, r)| {
-                r.broken_wiki_links
+            .iter_pages()
+            .zip(rendered.iter_pages())
+            .flat_map(|(page, rendered_page)| {
+                rendered_page
+                    .broken_wiki_links
                     .iter()
-                    .map(move |t| (slug.to_string(), t.clone()))
+                    .map(move |target| (page.slug().to_string(), target.clone()))
             })
             .chain(
                 rendered
@@ -195,14 +201,8 @@ impl<'a> Renderer<'a> {
         site_ctx: &SiteContext,
     ) -> Result<HashMap<String, String>, Error> {
         let wiki_categories = WikiCategory::from_site(site);
-        let all_pages: Vec<(PageAny<'_>, &Rendered)> = site
-            .blog
-            .iter()
-            .map(PageAny::Blog)
-            .zip(&rendered.blog)
-            .chain(site.wiki.iter().map(PageAny::Wiki).zip(&rendered.wiki))
-            .chain(site.pages.iter().map(PageAny::Page).zip(&rendered.pages))
-            .collect();
+        let all_pages: Vec<(PageAny<'_>, &Rendered)> =
+            site.iter_pages().zip(rendered.iter_pages()).collect();
 
         all_pages
             .into_par_iter()
