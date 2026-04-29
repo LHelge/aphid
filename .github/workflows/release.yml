@@ -11,48 +11,33 @@ env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -D warnings
 
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
 jobs:
-  ci:
-    name: CI
-    uses: ./.github/workflows/ci.yml
-
-  publish:
-    name: Publish to crates.io
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: ci
+  verify-tag:
+    name: Verify tag matches Cargo.toml
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
-        with:
-          toolchain: stable
-
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        if: startsWith(github.ref, 'refs/tags/v')
 
       - name: Verify tag matches Cargo.toml version
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           tag="${GITHUB_REF_NAME#v}"
-          manifest=$(cargo metadata --no-deps --format-version 1 \
-            | jq -r '.packages[] | select(.name == "aphid") | .version')
+          manifest=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
           if [ "$tag" != "$manifest" ]; then
             echo "::error::Tag $GITHUB_REF_NAME (=$tag) does not match Cargo.toml version $manifest"
             exit 1
           fi
 
-      - name: Publish
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish
+  ci:
+    name: CI
+    needs: verify-tag
+    uses: ./.github/workflows/ci.yml
 
   release:
     name: Create GitHub release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: publish
+    needs: ci
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -126,16 +111,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.ref_name }}" aphid-${{ github.ref_name }}-${{ matrix.target }}.*
 
-  docs:
-    name: Deploy docs
-    needs: ci
+  publish:
+    name: Publish to crates.io
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: binaries
     runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -145,14 +125,16 @@ jobs:
 
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
-      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - name: Publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish
 
-      - name: Build docs with aphid
-        run: cargo run --release -- --config docs/aphid.toml build --output _site
-
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: _site
-
-      - id: deployment
-        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+  docs:
+    name: Deploy docs
+    needs: ci
+    uses: ./.github/workflows/docs.yml
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
