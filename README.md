@@ -1,5 +1,11 @@
 # aphid
 
+[![CI](https://img.shields.io/github/actions/workflow/status/LHelge/aphid/ci.yml?branch=main&label=CI)](https://github.com/LHelge/aphid/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/aphid.svg)](https://crates.io/crates/aphid)
+[![docs.rs](https://img.shields.io/docsrs/aphid)](https://docs.rs/aphid)
+[![MSRV](https://img.shields.io/crates/msrv/aphid)](https://github.com/LHelge/aphid/blob/main/Cargo.toml)
+[![License](https://img.shields.io/crates/l/aphid.svg)](#license)
+
 A small static site generator that produces a **blog** and a **wiki** from a flat directory of markdown files, with `[[wiki-links]]` resolving across both.
 
 Designed to be driven from a GitHub Action for Pages deployment and from `aphid serve` for local writing with file watching and live reload.
