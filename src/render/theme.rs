@@ -32,11 +32,20 @@ const DEFAULT_TAG: &str = include_str!("../../default-theme/templates/tag.html")
 const DEFAULT_TAGS_INDEX: &str = include_str!("../../default-theme/templates/tags_index.html");
 const DEFAULT_404: &str = include_str!("../../default-theme/templates/404.html");
 
-// Embedded default theme static files (relative path → content)
-const DEFAULT_STATIC_FILES: &[(&str, &str)] = &[(
-    "css/theme.css",
-    include_str!("../../default-theme/static/css/theme.css"),
-)];
+// Embedded default theme static files (relative path → content).
+// `mermaid.min.js` is the upstream UMD bundle for client-side diagram
+// rendering, vendored here to avoid a CDN dependency. Yes, it's ~3 MB
+// of baked-in JS — that's the cost of self-contained mermaid support.
+const DEFAULT_STATIC_FILES: &[(&str, &str)] = &[
+    (
+        "css/theme.css",
+        include_str!("../../default-theme/static/css/theme.css"),
+    ),
+    (
+        "js/mermaid.min.js",
+        include_str!("../../default-theme/static/js/mermaid.min.js"),
+    ),
+];
 
 #[derive(Debug, Deserialize)]
 pub struct ThemeMeta {

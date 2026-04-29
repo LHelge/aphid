@@ -80,6 +80,47 @@
       btn.setAttribute('aria-expanded', String(!open));
     });
   </script>
+
+  {% if contains_mermaid %}
+  <script src="/static/js/mermaid.min.js"></script>
+  <script>
+    // Catppuccin Mocha palette to match the rest of the docs theme.
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        darkMode: true,
+        background: '#1e1e2e',
+        primaryColor: '#313244',
+        primaryTextColor: '#cdd6f4',
+        primaryBorderColor: '#cba6f7',
+        secondaryColor: '#45475a',
+        tertiaryColor: '#181825',
+        lineColor: '#b4befe',
+        textColor: '#cdd6f4',
+        mainBkg: '#313244',
+        nodeBorder: '#cba6f7',
+        clusterBkg: '#181825',
+        clusterBorder: '#45475a',
+        actorBkg: '#313244',
+        actorBorder: '#cba6f7',
+        actorTextColor: '#cdd6f4',
+        actorLineColor: '#b4befe',
+        signalColor: '#cdd6f4',
+        signalTextColor: '#cdd6f4',
+        labelBoxBkgColor: '#45475a',
+        labelBoxBorderColor: '#cba6f7',
+        labelTextColor: '#cdd6f4',
+        loopTextColor: '#cdd6f4',
+        noteBkgColor: '#f9e2af',
+        noteTextColor: '#1e1e2e',
+        noteBorderColor: '#fab387',
+        activationBkgColor: '#45475a',
+        activationBorderColor: '#cba6f7',
+      },
+    });
+  </script>
+  {% endif %}
 </body>
 
 </html>

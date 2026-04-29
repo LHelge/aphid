@@ -74,6 +74,32 @@ fn process(pages: &[Page<BlogFrontmatter>]) -> HashMap<String, String> {
 
 If the language is omitted or unrecognised, the block is rendered without highlighting. The built-in syntax set covers most common languages including Rust, Python, JavaScript, TypeScript, Go, C, C++, Shell, TOML, YAML, JSON, HTML, CSS, Dockerfile, and many more.
 
+## Mermaid diagrams
+
+Fenced blocks tagged `mermaid` are rendered as live diagrams in the browser using [Mermaid](https://mermaid.js.org/). The build pipeline emits the source as a `<pre class="mermaid">` element and the Mermaid runtime converts it to SVG client-side once the page loads:
+
+````markdown
+```mermaid
+sequenceDiagram
+    Alice->>John: Hello John, how are you?
+    John-->>Alice: Great!
+    Alice-)John: See you later!
+```
+````
+
+Renders as:
+
+```mermaid
+sequenceDiagram
+    Alice->>John: Hello John, how are you?
+    John-->>Alice: Great!
+    Alice-)John: See you later!
+```
+
+Mermaid supports flowcharts, sequence diagrams, class diagrams, state diagrams, gantt charts, mindmaps, and more — see the upstream [syntax reference](https://mermaid.js.org/intro/) for what's available.
+
+The Mermaid runtime is vendored with aphid (no CDN) and only loaded on pages that contain at least one mermaid block, so unrelated pages don't pay the bundle cost. If JavaScript is disabled, the original diagram source is shown as preformatted text.
+
 # External links
 
 Links whose URL starts with `http://` or `https://` are rewritten to open in a new tab and carry `rel="noopener noreferrer"`:

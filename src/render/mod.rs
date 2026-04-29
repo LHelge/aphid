@@ -268,17 +268,14 @@ impl<'a> Renderer<'a> {
 
         let posts = PostEntry::from_pages(site.blog.iter().map(PageAny::Blog));
 
-        let home_content = site.home.as_ref().map(|_| {
-            let rendered = rendered
-                .home
-                .as_ref()
-                .expect("home render should exist when home page is loaded");
-            HomeContent::from(rendered)
-        });
+        let home_rendered = site.home.as_ref().and(rendered.home.as_ref());
+        let home_content = home_rendered.map(HomeContent::from);
+        let contains_mermaid = home_rendered.is_some_and(|r| r.contains_mermaid);
         let home_ctx = HomeContext {
             site: site_ctx.clone(),
             posts: posts.clone(),
             home: home_content,
+            contains_mermaid,
         };
         pages.insert("/".into(), self.render_template("home.html", &home_ctx)?);
 
@@ -344,6 +341,7 @@ mod tests {
             content: "<p>Hello</p>".into(),
             toc: vec![],
             backlinks: vec![],
+            contains_mermaid: false,
             category: None,
             wiki_categories: vec![],
             author: Some("Alice".into()),
@@ -402,6 +400,7 @@ mod tests {
             content: "<p>Body here</p>".into(),
             toc: vec![],
             backlinks: vec![],
+            contains_mermaid: false,
             category: None,
             wiki_categories: vec![],
             author: Some("Alice".into()),

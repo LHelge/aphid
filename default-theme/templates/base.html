@@ -27,6 +27,11 @@
     <footer class="site-footer">
         <p>Built with <a href="https://github.com/LHelge/aphid">aphid</a></p>
     </footer>
+
+    {% if contains_mermaid %}
+    <script src="/static/js/mermaid.min.js"></script>
+    <script>mermaid.initialize({ startOnLoad: true });</script>
+    {% endif %}
 </body>
 
 </html>

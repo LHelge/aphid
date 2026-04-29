@@ -42,6 +42,10 @@ pub struct Rendered {
     /// `build` mode treats these as fatal; `serve` mode logs them and
     /// continues so writing isn't blocked.
     pub broken_wiki_links: Vec<String>,
+    /// Whether the body contains at least one ` ```mermaid ` block. Used by
+    /// the template layer to load the Mermaid runtime only on pages that
+    /// need it.
+    pub contains_mermaid: bool,
 }
 
 /// Markdown → HTML pipeline scoped to a [`Site`]: parses the body,
@@ -70,12 +74,13 @@ impl<'a> MarkdownRenderer<'a> {
         let events = rewrite_external_links(events);
         let events = rewrite_alerts(events);
         let (events, toc) = inject_heading_ids(events);
-        let events = self.highlighter.transform(events);
+        let (events, contains_mermaid) = self.highlighter.transform(events);
 
         Rendered {
             html: render_html(events),
             toc,
             broken_wiki_links,
+            contains_mermaid,
         }
     }
 }
