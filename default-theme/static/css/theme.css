@@ -182,20 +182,62 @@ pre.code-block {
 }
 
 /* Syntax highlighting */
-.hl-keyword { color: #c586c0; }
-.hl-keyword.hl-operator { color: #d4d4d4; }
-.hl-storage { color: #569cd6; }
-.hl-string { color: #ce9178; }
-.hl-comment { color: #6a9955; font-style: italic; }
-.hl-constant { color: #b5cea8; }
-.hl-entity.hl-name.hl-function { color: #dcdcaa; }
-.hl-entity.hl-name.hl-type { color: #4ec9b0; }
-.hl-entity.hl-name.hl-tag { color: #569cd6; }
-.hl-support.hl-function { color: #dcdcaa; }
-.hl-support.hl-type { color: #4ec9b0; }
-.hl-variable { color: #9cdcfe; }
-.hl-variable.hl-parameter { color: #9cdcfe; }
-.hl-punctuation { color: #d4d4d4; }
+.hl-keyword {
+    color: #c586c0;
+}
+
+.hl-keyword.hl-operator {
+    color: #d4d4d4;
+}
+
+.hl-storage {
+    color: #569cd6;
+}
+
+.hl-string {
+    color: #ce9178;
+}
+
+.hl-comment {
+    color: #6a9955;
+    font-style: italic;
+}
+
+.hl-constant {
+    color: #b5cea8;
+}
+
+.hl-entity.hl-name.hl-function {
+    color: #dcdcaa;
+}
+
+.hl-entity.hl-name.hl-type {
+    color: #4ec9b0;
+}
+
+.hl-entity.hl-name.hl-tag {
+    color: #569cd6;
+}
+
+.hl-support.hl-function {
+    color: #dcdcaa;
+}
+
+.hl-support.hl-type {
+    color: #4ec9b0;
+}
+
+.hl-variable {
+    color: #9cdcfe;
+}
+
+.hl-variable.hl-parameter {
+    color: #9cdcfe;
+}
+
+.hl-punctuation {
+    color: #d4d4d4;
+}
 
 /* Wiki links */
 .wikilink {
@@ -206,6 +248,68 @@ pre.code-block {
     color: #c0392b;
     border-bottom: 1px dashed #c0392b;
     cursor: help;
+}
+
+/* Markdown alerts */
+.markdown-alert {
+    border-left: 4px solid;
+    border-radius: 4px;
+    padding: 0.75rem 1rem;
+    margin: 1rem 0;
+}
+
+.markdown-alert> :last-child {
+    margin-bottom: 0;
+}
+
+.markdown-alert-title {
+    font-weight: 600;
+    margin: 0 0 0.25rem;
+}
+
+.markdown-alert-note {
+    border-color: #1a6fb5;
+    background: #eef4fa;
+}
+
+.markdown-alert-note .markdown-alert-title {
+    color: #1a6fb5;
+}
+
+.markdown-alert-tip {
+    border-color: #1a8d48;
+    background: #eef7f1;
+}
+
+.markdown-alert-tip .markdown-alert-title {
+    color: #1a8d48;
+}
+
+.markdown-alert-important {
+    border-color: #7c3aed;
+    background: #f3eefc;
+}
+
+.markdown-alert-important .markdown-alert-title {
+    color: #7c3aed;
+}
+
+.markdown-alert-warning {
+    border-color: #b58a1a;
+    background: #fdf8ea;
+}
+
+.markdown-alert-warning .markdown-alert-title {
+    color: #b58a1a;
+}
+
+.markdown-alert-caution {
+    border-color: #c0392b;
+    background: #fdf0ee;
+}
+
+.markdown-alert-caution .markdown-alert-title {
+    color: #c0392b;
 }
 
 /* Footer */

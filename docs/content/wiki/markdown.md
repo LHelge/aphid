@@ -146,11 +146,63 @@ Cross-links to any other page by filename stem:
 
 See [[wiki-links]] for full details.
 
+## Alerts
+
+GitHub-style alert blocks highlight important information. Five types are supported:
+
+```markdown
+> [!NOTE]
+> Highlights information that users should take into account, even when skimming.
+
+> [!TIP]
+> Optional information to help a user be more successful.
+
+> [!IMPORTANT]
+> Crucial information necessary for users to succeed.
+
+> [!WARNING]
+> Critical content demanding immediate user attention due to potential risks.
+
+> [!CAUTION]
+> Negative potential consequences of an action.
+```
+
+Here are rendered examples:
+
+> [!NOTE]
+> Highlights information that users should take into account, even when skimming.
+
+> [!TIP]
+> Optional information to help a user be more successful.
+
+> [!IMPORTANT]
+> Crucial information necessary for users to succeed.
+
+> [!WARNING]
+> Critical content demanding immediate user attention due to potential risks.
+
+> [!CAUTION]
+> Negative potential consequences of an action.
+
+Alerts are rendered as `<div class="markdown-alert markdown-alert-{type}">` elements with a title paragraph, so themes can style each type independently. Regular blockquotes (`>` without a `[!TYPE]` marker) are unaffected.
+
+## Smart punctuation
+
+ASCII punctuation is automatically replaced with typographically correct Unicode characters during rendering:
+
+| Input | Output | Description |
+|-------|--------|-------------|
+| `"quote"` | “quote” | Curly double quotes |
+| `'quote'` | ‘quote’ | Curly single quotes |
+| `--` | – | En dash |
+| `---` | — | Em dash |
+| `...` | … | Ellipsis |
+
+This happens at parse time and requires no special syntax — just write natural prose and the output will use proper typographic characters.
+
 # Not supported
 
 The following are not enabled:
 
-- Smart punctuation (straight quotes and dashes are left as-is)
 - Math (`$...$` / `$$...$$`)
-- GitHub-style alert blocks (`> [!NOTE]`)
 - Custom heading ID syntax (`# Heading {#custom-id}`) — IDs are auto-generated from the heading text

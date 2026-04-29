@@ -1,8 +1,10 @@
+pub mod alerts;
 pub mod anchors;
 pub mod external_links;
 pub mod highlight;
 pub mod wikilinks;
 
+pub use alerts::rewrite_alerts;
 pub use anchors::{HeadingEntry, inject_heading_ids};
 pub use external_links::rewrite_external_links;
 pub use highlight::Highlighter;
@@ -50,11 +52,14 @@ impl<'a> MarkdownRenderer<'a> {
         opts.insert(Options::ENABLE_STRIKETHROUGH);
         opts.insert(Options::ENABLE_TASKLISTS);
         opts.insert(Options::ENABLE_WIKILINKS);
+        opts.insert(Options::ENABLE_GFM);
+        opts.insert(Options::ENABLE_SMART_PUNCTUATION);
 
         let events: Vec<_> = Parser::new_ext(body, opts).collect();
 
         let (events, broken_wiki_links) = rewrite_wiki_links(events, self.site);
         let events = rewrite_external_links(events);
+        let events = rewrite_alerts(events);
         let (events, toc) = inject_heading_ids(events);
         let events = self.highlighter.transform(events);
 
