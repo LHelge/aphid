@@ -60,6 +60,15 @@ pub struct BacklinkEntry {
     pub url: String,
 }
 
+impl From<&PageAny<'_>> for BacklinkEntry {
+    fn from(page: &PageAny<'_>) -> Self {
+        Self {
+            title: page.title().into_owned(),
+            url: page.url_path(),
+        }
+    }
+}
+
 /// A tag reference with both a display name and a URL-safe slug.
 #[derive(Debug, Clone, Serialize)]
 pub struct TagRef {
@@ -298,10 +307,7 @@ impl PageContext {
             backlinks: site
                 .backlinks_for(page.slug())
                 .iter()
-                .map(|p| BacklinkEntry {
-                    title: p.title().into_owned(),
-                    url: p.url_path(),
-                })
+                .map(BacklinkEntry::from)
                 .collect(),
             category: page.category().map(String::from),
             wiki_categories: match page.kind() {

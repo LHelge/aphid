@@ -16,6 +16,15 @@ struct Entry {
     lastmod: Option<String>,
 }
 
+impl Entry {
+    fn new(base: &str, url_path: &str, lastmod: Option<String>) -> Self {
+        Self {
+            loc: format!("{base}{url_path}"),
+            lastmod,
+        }
+    }
+}
+
 impl Sitemap {
     /// Build a sitemap from the fully-loaded site.
     pub fn new(site: &Site) -> Self {
@@ -24,32 +33,20 @@ impl Sitemap {
         let mut entries = Vec::new();
 
         // Home
-        entries.push(Entry {
-            loc: format!("{base}/"),
-            lastmod: None,
-        });
+        entries.push(Entry::new(base, "/", None));
 
         // Blog index
-        entries.push(Entry {
-            loc: format!("{base}/blog/"),
-            lastmod: None,
-        });
+        entries.push(Entry::new(base, "/blog/", None));
 
         // Blog posts — always have a date
         for post in &site.blog {
             let url = PageKind::Blog.url_path(&post.slug);
             let date = post.frontmatter.updated.unwrap_or(post.frontmatter.created);
-            entries.push(Entry {
-                loc: format!("{base}{url}"),
-                lastmod: Some(date.to_string()),
-            });
+            entries.push(Entry::new(base, &url, Some(date.to_string())));
         }
 
         // Wiki index
-        entries.push(Entry {
-            loc: format!("{base}/wiki/"),
-            lastmod: None,
-        });
+        entries.push(Entry::new(base, "/wiki/", None));
 
         // Wiki pages — date only when present
         for page in &site.wiki {
@@ -59,27 +56,18 @@ impl Sitemap {
                 .updated
                 .or(page.frontmatter.created)
                 .map(|d| d.to_string());
-            entries.push(Entry {
-                loc: format!("{base}{url}"),
-                lastmod: date,
-            });
+            entries.push(Entry::new(base, &url, date));
         }
 
         // Standalone pages
         for page in &site.pages {
             let url = PageKind::Page.url_path(&page.slug);
-            entries.push(Entry {
-                loc: format!("{base}{url}"),
-                lastmod: None,
-            });
+            entries.push(Entry::new(base, &url, None));
         }
 
         // Tags index
         if !site.tag_index.is_empty() {
-            entries.push(Entry {
-                loc: format!("{base}/tags/"),
-                lastmod: None,
-            });
+            entries.push(Entry::new(base, "/tags/", None));
         }
 
         // Individual tag pages
@@ -87,10 +75,7 @@ impl Sitemap {
         tags.sort();
         for tag in tags {
             let slug: Slug = tag.as_str().into();
-            entries.push(Entry {
-                loc: format!("{base}/tags/{slug}/"),
-                lastmod: None,
-            });
+            entries.push(Entry::new(base, &format!("/tags/{slug}/"), None));
         }
 
         Self {

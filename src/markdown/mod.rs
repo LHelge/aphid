@@ -21,6 +21,12 @@ pub(crate) fn html_escape(text: &str) -> String {
         .replace('"', "&quot;")
 }
 
+pub(crate) fn render_html(events: Vec<pulldown_cmark::Event<'_>>) -> String {
+    let mut output = String::new();
+    html::push_html(&mut output, events.into_iter());
+    output
+}
+
 fn markdown_options() -> Options {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
@@ -73,11 +79,8 @@ impl<'a> MarkdownRenderer<'a> {
         let (events, toc) = inject_heading_ids(events);
         let events = self.highlighter.transform(events);
 
-        let mut output = String::new();
-        html::push_html(&mut output, events.into_iter());
-
         Rendered {
-            html: output,
+            html: render_html(events),
             toc,
             broken_wiki_links,
         }

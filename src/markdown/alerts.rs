@@ -49,16 +49,14 @@ fn alert_meta(kind: BlockQuoteKind) -> (&'static str, &'static str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pulldown_cmark::{Options, Parser, html};
+    use pulldown_cmark::{Options, Parser};
 
     fn render(input: &str) -> String {
         let mut opts = Options::empty();
         opts.insert(Options::ENABLE_GFM);
         let events: Vec<_> = Parser::new_ext(input, opts).collect();
         let events = rewrite_alerts(events);
-        let mut output = String::new();
-        html::push_html(&mut output, events.into_iter());
-        output
+        crate::markdown::render_html(events)
     }
 
     #[test]

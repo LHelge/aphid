@@ -120,7 +120,7 @@ impl Highlighter {
 
 #[cfg(test)]
 mod tests {
-    use pulldown_cmark::{Options, Parser, html};
+    use pulldown_cmark::{Options, Parser};
 
     use super::*;
 
@@ -128,9 +128,7 @@ mod tests {
         let events: Vec<_> = Parser::new_ext(input, Options::empty()).collect();
         let highlighter = Highlighter::new();
         let events = highlighter.transform(events);
-        let mut output = String::new();
-        html::push_html(&mut output, events.into_iter());
-        output
+        crate::markdown::render_html(events)
     }
 
     #[test]
