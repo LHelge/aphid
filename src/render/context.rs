@@ -5,7 +5,7 @@ use serde::Serialize;
 use crate::config::{Config, Social};
 use crate::content::page::{Page, PageKind};
 use crate::content::slug::Slug;
-use crate::content::{PageAny, PageFrontmatter, Site};
+use crate::content::{PageAny, PageFrontmatter, Site, WikiFrontmatter};
 use crate::markdown::{HeadingEntry, Rendered};
 
 /// A single nav entry for standalone pages, available to all templates.
@@ -15,19 +15,22 @@ pub struct NavEntry {
     pub url: String,
 }
 
+impl From<&Page<PageFrontmatter>> for NavEntry {
+    fn from(page: &Page<PageFrontmatter>) -> Self {
+        Self {
+            title: page.title().to_string(),
+            url: PageKind::Page.url_path(&page.slug),
+        }
+    }
+}
+
 impl NavEntry {
     pub fn from_pages(pages: &[Page<PageFrontmatter>]) -> Vec<Self> {
         let mut entries: Vec<_> = pages
             .iter()
             .map(|p| {
                 let order = p.frontmatter.order.unwrap_or(i32::MAX);
-                (
-                    order,
-                    NavEntry {
-                        title: p.title().to_string(),
-                        url: PageKind::Page.url_path(&p.slug),
-                    },
-                )
+                (order, NavEntry::from(p))
             })
             .collect();
         entries.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.title.cmp(&b.1.title)));
@@ -133,6 +136,14 @@ pub struct HomeContent {
     pub content: String,
 }
 
+impl From<&Rendered> for HomeContent {
+    fn from(rendered: &Rendered) -> Self {
+        Self {
+            content: rendered.html.clone(),
+        }
+    }
+}
+
 /// Context for the home page (`/`). Same posts as the blog index, plus
 /// the optional rendered home-page content.
 #[derive(Debug, Serialize)]
@@ -148,6 +159,15 @@ pub struct HomeContext {
 pub struct WikiEntry {
     pub title: String,
     pub url: String,
+}
+
+impl From<&Page<WikiFrontmatter>> for WikiEntry {
+    fn from(page: &Page<WikiFrontmatter>) -> Self {
+        Self {
+            title: page.title().to_string(),
+            url: page.url_path(),
+        }
+    }
 }
 
 /// A group of wiki pages sharing the same category.
@@ -175,10 +195,7 @@ impl WikiCategory {
             by_category
                 .entry(p.frontmatter.category.clone())
                 .or_default()
-                .push(WikiEntry {
-                    title: p.title().to_string(),
-                    url: p.url_path(),
-                });
+                .push(WikiEntry::from(p));
         }
         for entries in by_category.values_mut() {
             entries.sort_by(|a, b| a.title.cmp(&b.title));
@@ -223,6 +240,16 @@ pub struct TagEntry {
     pub name: String,
     pub slug: Slug,
     pub count: usize,
+}
+
+impl TagEntry {
+    pub fn new(name: &str, count: usize) -> Self {
+        Self {
+            name: name.to_owned(),
+            slug: name.into(),
+            count,
+        }
+    }
 }
 
 /// Context for the tags index page (list of all tags).

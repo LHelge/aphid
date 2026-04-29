@@ -229,11 +229,7 @@ impl<'a> Renderer<'a> {
                 .collect();
 
             let tag_slug: Slug = tag.as_str().into();
-            all_tags.push(TagEntry {
-                name: tag.clone(),
-                slug: tag_slug.clone(),
-                count: posts.len(),
-            });
+            all_tags.push(TagEntry::new(tag, posts.len()));
 
             let ctx = TagPageContext {
                 site: site_ctx.clone(),
@@ -276,9 +272,7 @@ impl<'a> Renderer<'a> {
                 .home
                 .as_ref()
                 .expect("home render should exist when home page is loaded");
-            HomeContent {
-                content: rendered.html.clone(),
-            }
+            HomeContent::from(rendered)
         });
         let home_ctx = HomeContext {
             site: site_ctx.clone(),
