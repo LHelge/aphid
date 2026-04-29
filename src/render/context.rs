@@ -67,6 +67,15 @@ pub struct TagRef {
     pub slug: Slug,
 }
 
+impl From<&str> for TagRef {
+    fn from(tag: &str) -> Self {
+        Self {
+            name: tag.to_owned(),
+            slug: tag.into(),
+        }
+    }
+}
+
 /// A blog post summary for index/tag listing pages.
 #[derive(Debug, Clone, Serialize)]
 pub struct PostEntry {
@@ -89,14 +98,7 @@ impl PostEntry {
             created: any.created(),
             image: any.image().map(String::from),
             description: any.description().map(String::from),
-            tags: any
-                .tags()
-                .iter()
-                .map(|t| TagRef {
-                    name: t.clone(),
-                    slug: t.as_str().into(),
-                })
-                .collect(),
+            tags: any.tags().iter().map(|tag| TagRef::from(tag.as_str())).collect(),
         }
     }
 }
@@ -273,6 +275,7 @@ impl PageContext {
         rendered: &Rendered,
         site: &Site,
         site_ctx: &SiteContext,
+        wiki_categories: &[WikiCategory],
     ) -> Self {
         Self {
             site: site_ctx.clone(),
@@ -291,7 +294,7 @@ impl PageContext {
                 .collect(),
             category: page.category().map(String::from),
             wiki_categories: match page.kind() {
-                PageKind::Wiki => WikiCategory::from_site(site),
+                PageKind::Wiki => wiki_categories.to_vec(),
                 _ => Vec::new(),
             },
             author: page.author().map(String::from),
@@ -302,10 +305,7 @@ impl PageContext {
             tags: page
                 .tags()
                 .iter()
-                .map(|t| TagRef {
-                    name: t.clone(),
-                    slug: t.as_str().into(),
-                })
+                .map(|tag| TagRef::from(tag.as_str()))
                 .collect(),
         }
     }

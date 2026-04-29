@@ -77,6 +77,7 @@ struct RenderedPages {
     blog: Vec<Rendered>,
     wiki: Vec<Rendered>,
     pages: Vec<Rendered>,
+    home: Option<Rendered>,
 }
 
 /// Pass-2 orchestrator: takes a [`Site`] and a [`Theme`] and produces a
@@ -107,7 +108,7 @@ impl<'a> Renderer<'a> {
         let site_ctx = SiteContext::from_config(&site.config, &site.pages);
         let mut pages = self.render_content_pages(&rendered, site, &site_ctx)?;
         pages.extend(self.render_tag_pages(site, &site_ctx)?);
-        pages.extend(self.render_index_pages(site, &site_ctx)?);
+        pages.extend(self.render_index_pages(site, &rendered, &site_ctx)?);
 
         let mut not_found_html =
             self.render_template("404.html", &NotFoundContext { site: site_ctx })?;
@@ -144,7 +145,13 @@ impl<'a> Renderer<'a> {
             || site.wiki.par_iter().map(|p| md.render(&p.body)).collect(),
         );
         let pages = site.pages.iter().map(|p| md.render(&p.body)).collect();
-        RenderedPages { blog, wiki, pages }
+        let home = site.home.as_ref().map(|page| md.render(&page.body));
+        RenderedPages {
+            blog,
+            wiki,
+            pages,
+            home,
+        }
     }
 
     fn check_broken_links(rendered: &RenderedPages, site: &Site, fail: bool) -> Result<(), Error> {
@@ -155,18 +162,27 @@ impl<'a> Renderer<'a> {
             .zip(&rendered.blog)
             .chain(site.wiki.iter().map(|p| &p.slug).zip(&rendered.wiki))
             .chain(site.pages.iter().map(|p| &p.slug).zip(&rendered.pages))
-            .flat_map(|(slug, r)| r.broken_wiki_links.iter().map(move |t| (slug, t)));
+            .flat_map(|(slug, r)| {
+                r.broken_wiki_links
+                    .iter()
+                    .map(move |t| (slug.to_string(), t.clone()))
+            })
+            .chain(
+                rendered
+                    .home
+                    .iter()
+                    .flat_map(|r| r.broken_wiki_links.iter().cloned())
+                    .map(|target| ("home.md".to_string(), target)),
+            );
 
         if fail {
-            let broken: Vec<(String, String)> = all_broken
-                .map(|(slug, target)| (slug.to_string(), target.clone()))
-                .collect();
+            let broken: Vec<(String, String)> = all_broken.collect();
             if !broken.is_empty() {
                 return Err(Error::BrokenWikiLinks(broken));
             }
         } else {
             for (slug, target) in all_broken {
-                tracing::warn!(page = %slug, target, "broken wiki-link");
+                tracing::warn!(page = slug, target, "broken wiki-link");
             }
         }
         Ok(())
@@ -178,6 +194,7 @@ impl<'a> Renderer<'a> {
         site: &Site,
         site_ctx: &SiteContext,
     ) -> Result<HashMap<String, String>, Error> {
+        let wiki_categories = WikiCategory::from_site(site);
         let all_pages: Vec<(PageAny<'_>, &Rendered)> = site
             .blog
             .iter()
@@ -190,7 +207,7 @@ impl<'a> Renderer<'a> {
         all_pages
             .into_par_iter()
             .map(|(page, md)| {
-                let ctx = PageContext::from_page(&page, md, site, site_ctx);
+                let ctx = PageContext::from_page(&page, md, site, site_ctx, &wiki_categories);
                 let html = self.render_template(ctx.template_name(), &ctx)?;
                 Ok((ctx.url, html))
             })
@@ -242,9 +259,11 @@ impl<'a> Renderer<'a> {
     fn render_index_pages(
         &self,
         site: &Site,
+        rendered: &RenderedPages,
         site_ctx: &SiteContext,
     ) -> Result<HashMap<String, String>, Error> {
         let mut pages = HashMap::new();
+        let wiki_categories = WikiCategory::from_site(site);
 
         let posts: Vec<PostEntry> = site
             .blog
@@ -252,10 +271,13 @@ impl<'a> Renderer<'a> {
             .map(|p| PostEntry::from_page(&PageAny::Blog(p)))
             .collect();
 
-        let home_content = site.home.as_ref().map(|h| {
-            let rendered = MarkdownRenderer::new(site).render(&h.body);
+        let home_content = site.home.as_ref().map(|_| {
+            let rendered = rendered
+                .home
+                .as_ref()
+                .expect("home render should exist when home page is loaded");
             HomeContent {
-                content: rendered.html,
+                content: rendered.html.clone(),
             }
         });
         let home_ctx = HomeContext {
@@ -276,7 +298,7 @@ impl<'a> Renderer<'a> {
 
         let wiki_ctx = WikiIndexContext {
             site: site_ctx.clone(),
-            categories: WikiCategory::from_site(site),
+            categories: wiki_categories,
         };
         pages.insert(
             "/wiki/".into(),

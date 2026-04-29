@@ -1,5 +1,6 @@
 use pulldown_cmark::{Event, LinkType, Options, Parser, Tag, TagEnd};
 
+use super::html_escape;
 use crate::content::{Site, Slug};
 
 /// A `[[wiki-link]]` parsed out of a markdown body. `display` is `Some`
@@ -120,13 +121,6 @@ pub fn rewrite_wiki_links<'a>(
     });
 
     (out, broken)
-}
-
-fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
 }
 
 #[cfg(test)]
