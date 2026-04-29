@@ -173,6 +173,30 @@ See [[nonexistent]] for details.",
 }
 
 #[tokio::test]
+async fn broken_wiki_link_in_home_fails_build() {
+    let dir = TempDir::new().unwrap();
+    let content_dir = dir.path().join("content");
+    let config_path = common::write_fixture_config(dir.path(), &content_dir);
+
+    write_file(
+        &content_dir.join("home.md"),
+        "# Welcome\n\nSee [[missing-home-link]] for details.\n",
+    );
+
+    let result = aphid::build(&config_path, &dir.path().join("dist")).await;
+    let err = result.expect_err("build should fail on broken home wiki-link");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("missing-home-link"),
+        "error should mention the broken target: {msg}"
+    );
+    assert!(
+        msg.contains("home.md"),
+        "error should mention home.md as the source: {msg}"
+    );
+}
+
+#[tokio::test]
 async fn build_output_does_not_contain_live_reload_script() {
     let (_dir, output) = build_fixture_site().await;
 

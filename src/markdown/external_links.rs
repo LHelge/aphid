@@ -1,5 +1,7 @@
 use pulldown_cmark::{Event, LinkType, Tag, TagEnd};
 
+use super::html_escape;
+
 /// Rewrite `http://` and `https://` markdown links to open in a new tab
 /// with `rel="noopener noreferrer"`. Wiki-links are left alone — they're
 /// always internal and are handled by [`super::wikilinks`] earlier in the
@@ -43,13 +45,6 @@ pub fn rewrite_external_links(events: Vec<Event<'_>>) -> Vec<Event<'_>> {
 
 fn is_external(url: &str) -> bool {
     url.starts_with("http://") || url.starts_with("https://")
-}
-
-fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
 }
 
 #[cfg(test)]

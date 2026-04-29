@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use image::codecs::ico::{IcoEncoder, IcoFrame};
 use image::imageops::FilterType;
 use image::{DynamicImage, ImageFormat};
+use serde::Serialize;
 
 use crate::Error;
 
@@ -141,6 +142,20 @@ const FAVICON_HTML: &str = concat!(
     "    <link rel=\"manifest\" href=\"/site.webmanifest\">\n",
 );
 
+#[derive(Serialize)]
+struct WebManifest<'a> {
+    name: &'a str,
+    icons: Vec<WebManifestIcon<'a>>,
+}
+
+#[derive(Serialize)]
+struct WebManifestIcon<'a> {
+    src: &'a str,
+    sizes: &'a str,
+    #[serde(rename = "type")]
+    mime_type: &'a str,
+}
+
 impl FaviconSet {
     /// Load the source image (raster or SVG), resize it to every standard
     /// favicon size, and produce the corresponding files and HTML tags.
@@ -176,11 +191,22 @@ impl FaviconSet {
     }
 
     fn webmanifest(site_title: &str) -> String {
-        let escaped = site_title.replace('\\', "\\\\").replace('"', "\\\"");
-        format!(
-            "{{\"name\":\"{}\",\"icons\":[{{\"src\":\"/android-chrome-192x192.png\",\"sizes\":\"192x192\",\"type\":\"image/png\"}},{{\"src\":\"/android-chrome-512x512.png\",\"sizes\":\"512x512\",\"type\":\"image/png\"}}]}}",
-            escaped
-        )
+        let manifest = WebManifest {
+            name: site_title,
+            icons: vec![
+                WebManifestIcon {
+                    src: "/android-chrome-192x192.png",
+                    sizes: "192x192",
+                    mime_type: "image/png",
+                },
+                WebManifestIcon {
+                    src: "/android-chrome-512x512.png",
+                    sizes: "512x512",
+                    mime_type: "image/png",
+                },
+            ],
+        };
+        serde_json::to_string(&manifest).expect("webmanifest serialization should succeed")
     }
 }
 
@@ -239,14 +265,16 @@ mod tests {
     #[test]
     fn webmanifest_contains_title() {
         let json = FaviconSet::webmanifest("My Cool Site");
-        assert!(json.contains("My Cool Site"));
-        assert!(json.contains("android-chrome-192x192.png"));
-        assert!(json.contains("android-chrome-512x512.png"));
+        let manifest: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(manifest["name"], "My Cool Site");
+        assert_eq!(manifest["icons"][0]["src"], "/android-chrome-192x192.png");
+        assert_eq!(manifest["icons"][1]["src"], "/android-chrome-512x512.png");
     }
 
     #[test]
     fn webmanifest_escapes_special_chars() {
         let json = FaviconSet::webmanifest(r#"Site "with" quotes"#);
-        assert!(json.contains(r#"Site \"with\" quotes"#));
+        let manifest: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(manifest["name"], r#"Site "with" quotes"#);
     }
 }

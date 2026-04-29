@@ -147,6 +147,67 @@ See [[missing]] for details.",
 }
 
 #[tokio::test]
+async fn serve_broken_wiki_link_in_home_still_serves() {
+    let dir = TempDir::new().unwrap();
+    let content_dir = dir.path().join("content");
+    let config_path = common::write_fixture_config(dir.path(), &content_dir);
+    let theme_dir = dir.path().join("theme");
+
+    write_file(
+        &content_dir.join("home.md"),
+        "# Welcome\n\nSee [[missing-home-link]] for details.\n",
+    );
+    write_file(
+        &theme_dir.join("theme.toml"),
+        "name = \"test\"\nversion = \"0.1.0\"\n",
+    );
+    for template in [
+        "base.html",
+        "blog_post.html",
+        "blog_index.html",
+        "wiki_page.html",
+        "wiki_index.html",
+        "page.html",
+        "tag.html",
+        "tags_index.html",
+        "404.html",
+    ] {
+        write_file(
+            &theme_dir.join("templates").join(template),
+            "{% block content %}{% endblock content %}",
+        );
+    }
+    write_file(
+        &theme_dir.join("templates/home.html"),
+        r#"{% extends "base.html" %}
+{% block content %}{{ home.content | safe }}{% endblock content %}
+"#,
+    );
+    let mut config = std::fs::read_to_string(&config_path).unwrap();
+    config.push_str(&format!("theme_dir = \"{}\"\n", theme_dir.display()));
+    std::fs::write(&config_path, config).unwrap();
+
+    let (port, _state, handle) = aphid::serve::Server::new(&config_path)
+        .unwrap()
+        .spawn_test()
+        .await
+        .unwrap();
+
+    let resp = reqwest::get(format!("http://127.0.0.1:{port}/"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200, "broken link should not prevent serving");
+
+    let body = resp.text().await.unwrap();
+    assert!(
+        body.contains("wikilink broken"),
+        "home page HTML should contain broken wikilink span"
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
 async fn serve_websocket_receives_reload() {
     use futures_util::StreamExt;
     use tokio_tungstenite::connect_async;

@@ -14,6 +14,13 @@ use pulldown_cmark::{Options, Parser, html};
 
 use crate::content::Site;
 
+pub(crate) fn html_escape(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
 /// The output of rendering one markdown body.
 pub struct Rendered {
     /// Body HTML, ready to be wrapped in a Tera template.
