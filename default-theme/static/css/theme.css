@@ -181,6 +181,18 @@ pre.code-block {
     line-height: 1.5;
 }
 
+/* Mermaid diagrams. Source is kept in a <pre class="mermaid"> so it's
+   readable if JS doesn't load; once mermaid.js runs, the SVG replaces
+   the text and these styles defer to whatever mermaid emits. */
+pre.mermaid {
+    background: transparent;
+    border: none;
+    padding: 0;
+    text-align: center;
+    overflow: visible;
+    font-family: inherit;
+}
+
 /* Syntax highlighting */
 .hl-keyword {
     color: #c586c0;

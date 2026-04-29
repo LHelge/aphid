@@ -164,13 +164,16 @@ impl From<&Rendered> for HomeContent {
 }
 
 /// Context for the home page (`/`). Same posts as the blog index, plus
-/// the optional rendered home-page content.
+/// the optional rendered home-page content. `contains_mermaid` mirrors
+/// the field on `PageContext` so `base.html` can use one check across
+/// all page types.
 #[derive(Debug, Serialize)]
 pub struct HomeContext {
     #[serde(flatten)]
     pub site: SiteContext,
     pub posts: Vec<PostEntry>,
     pub home: Option<HomeContent>,
+    pub contains_mermaid: bool,
 }
 
 /// A wiki page summary for the wiki index listing.
@@ -332,6 +335,10 @@ pub struct PageContext {
     pub content: String,
     pub toc: Vec<TocEntry>,
     pub backlinks: Vec<BacklinkEntry>,
+    /// `true` when the page body contains at least one ` ```mermaid `
+    /// block. Templates use this to load the Mermaid runtime only on the
+    /// pages that need it.
+    pub contains_mermaid: bool,
 
     // Wiki-specific (None / empty for blog/page)
     pub category: Option<String>,
@@ -366,6 +373,7 @@ impl PageContext {
                 .iter()
                 .map(BacklinkEntry::from)
                 .collect(),
+            contains_mermaid: rendered.contains_mermaid,
             category: owned(page.category()),
             wiki_categories: match page.kind() {
                 PageKind::Wiki => wiki_categories.to_vec(),

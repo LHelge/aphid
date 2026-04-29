@@ -22,6 +22,10 @@ const EXTRA_SYNTAXES: &[(&str, &str)] = &[
     ),
 ];
 
+fn is_mermaid(lang: Option<&str>) -> bool {
+    lang.is_some_and(|l| l.eq_ignore_ascii_case("mermaid"))
+}
+
 fn build_syntax_set() -> SyntaxSet {
     let mut builder = SyntaxSet::load_defaults_newlines().into_builder();
     for (name, source) in EXTRA_SYNTAXES {
@@ -54,9 +58,14 @@ impl Highlighter {
         Self { syntax_set }
     }
 
-    pub fn transform<'a>(&self, events: Vec<Event<'a>>) -> Vec<Event<'a>> {
+    /// Returns the transformed events along with `contains_mermaid` —
+    /// `true` when at least one fenced ` ```mermaid ` block was seen, so the
+    /// rendering layer can decide whether to load the Mermaid runtime on
+    /// this page.
+    pub fn transform<'a>(&self, events: Vec<Event<'a>>) -> (Vec<Event<'a>>, bool) {
         let mut out = Vec::with_capacity(events.len());
         let mut code_state: Option<(Option<String>, String)> = None;
+        let mut contains_mermaid = false;
 
         for event in events {
             match code_state.take() {
@@ -74,7 +83,12 @@ impl Highlighter {
                 },
                 Some(mut state) => match event {
                     Event::End(TagEnd::CodeBlock) => {
-                        let html = self.highlight(&state.0, &state.1);
+                        let html = if is_mermaid(state.0.as_deref()) {
+                            contains_mermaid = true;
+                            format!("<pre class=\"mermaid\">{}</pre>", escape_html(&state.1))
+                        } else {
+                            self.highlight(&state.0, &state.1)
+                        };
                         out.push(Event::Html(html.into()));
                     }
                     Event::Text(t) => {
@@ -89,7 +103,7 @@ impl Highlighter {
             }
         }
 
-        out
+        (out, contains_mermaid)
     }
 
     fn highlight(&self, lang: &Option<String>, code: &str) -> String {
@@ -125,10 +139,14 @@ mod tests {
     use super::*;
 
     fn render_with_highlight(input: &str) -> String {
+        transform(input).0
+    }
+
+    fn transform(input: &str) -> (String, bool) {
         let events: Vec<_> = Parser::new_ext(input, Options::empty()).collect();
         let highlighter = Highlighter::new();
-        let events = highlighter.transform(events);
-        crate::markdown::render_html(events)
+        let (events, contains_mermaid) = highlighter.transform(events);
+        (crate::markdown::render_html(events), contains_mermaid)
     }
 
     #[test]
@@ -169,5 +187,39 @@ mod tests {
             !html.contains("style=\""),
             "should use CSS classes, not inline styles"
         );
+    }
+
+    #[test]
+    fn mermaid_block_emits_pre_class_mermaid() {
+        let (html, contains_mermaid) =
+            transform("```mermaid\nsequenceDiagram\n    A->>B: hi\n```\n");
+        assert!(contains_mermaid);
+        assert!(html.contains("<pre class=\"mermaid\">"));
+        assert!(html.contains("sequenceDiagram"));
+        assert!(html.contains("A-&gt;&gt;B: hi"));
+        // Must NOT have been run through syntect.
+        assert!(!html.contains("class=\"hl-"));
+        assert!(!html.contains("class=\"code-block\""));
+    }
+
+    #[test]
+    fn mermaid_block_escapes_html_in_source() {
+        let (html, contains_mermaid) =
+            transform("```mermaid\nA-->B: <script>alert(1)</script>\n```\n");
+        assert!(contains_mermaid);
+        assert!(!html.contains("<script>alert(1)</script>"));
+        assert!(html.contains("&lt;script&gt;"));
+    }
+
+    #[test]
+    fn mermaid_lang_tag_is_case_insensitive() {
+        let (_html, contains_mermaid) = transform("```Mermaid\ngraph LR; A-->B\n```\n");
+        assert!(contains_mermaid);
+    }
+
+    #[test]
+    fn no_mermaid_flag_when_absent() {
+        let (_html, contains_mermaid) = transform("```rust\nfn main() {}\n```\n");
+        assert!(!contains_mermaid);
     }
 }
