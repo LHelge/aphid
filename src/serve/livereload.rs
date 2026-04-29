@@ -6,6 +6,7 @@ use axum::response::Response;
 use tokio::sync::broadcast;
 
 use super::AppState;
+use crate::html::insert_before_closing_tag;
 
 /// Handle a WebSocket upgrade request for live reload.
 pub(crate) async fn ws_handler(
@@ -56,16 +57,9 @@ pub const LIVE_RELOAD_SCRIPT: &str = r#"<script>(function(){var ws=new WebSocket
 /// If `</body>` is not found, appends the script at the end.
 pub fn inject_live_reload(html: &str) -> String {
     let mut result = String::with_capacity(html.len() + LIVE_RELOAD_SCRIPT.len());
-    match html.rfind("</body>") {
-        Some(pos) => {
-            result.push_str(&html[..pos]);
-            result.push_str(LIVE_RELOAD_SCRIPT);
-            result.push_str(&html[pos..]);
-        }
-        None => {
-            result.push_str(html);
-            result.push_str(LIVE_RELOAD_SCRIPT);
-        }
+    result.push_str(html);
+    if !insert_before_closing_tag(&mut result, "</body>", LIVE_RELOAD_SCRIPT) {
+        result.push_str(LIVE_RELOAD_SCRIPT);
     }
     result
 }
