@@ -115,9 +115,10 @@ impl<'a> Renderer<'a> {
         Self::check_broken_links(&rendered, site, fail_on_broken_links)?;
 
         let site_ctx = SiteContext::from_config(&site.config, &site.pages);
-        let mut pages = self.render_content_pages(&rendered, site, &site_ctx)?;
+        let wiki_categories = WikiCategory::from_site(site);
+        let mut pages = self.render_content_pages(&rendered, site, &site_ctx, &wiki_categories)?;
         pages.extend(self.render_tag_pages(site, &site_ctx)?);
-        pages.extend(self.render_index_pages(site, &rendered, &site_ctx)?);
+        pages.extend(self.render_index_pages(site, &rendered, &site_ctx, &wiki_categories)?);
 
         let mut not_found_html =
             self.render_template("404.html", &NotFoundContext { site: site_ctx })?;
@@ -205,15 +206,15 @@ impl<'a> Renderer<'a> {
         rendered: &RenderedPages,
         site: &Site,
         site_ctx: &SiteContext,
+        wiki_categories: &[WikiCategory],
     ) -> Result<HashMap<String, String>, Error> {
-        let wiki_categories = WikiCategory::from_site(site);
         let all_pages: Vec<(PageAny<'_>, &Rendered)> =
             site.iter_pages().zip(rendered.iter_pages()).collect();
 
         all_pages
             .into_par_iter()
             .map(|(page, md)| {
-                let ctx = PageContext::from_page(&page, md, site, site_ctx, &wiki_categories);
+                let ctx = PageContext::from_page(&page, md, site, site_ctx, wiki_categories);
                 let html = self.render_template(ctx.template_name(), &ctx)?;
                 Ok((ctx.url, html))
             })
@@ -261,9 +262,9 @@ impl<'a> Renderer<'a> {
         site: &Site,
         rendered: &RenderedPages,
         site_ctx: &SiteContext,
+        wiki_categories: &[WikiCategory],
     ) -> Result<HashMap<String, String>, Error> {
         let mut pages = HashMap::new();
-        let wiki_categories = WikiCategory::from_site(site);
 
         let posts = PostEntry::from_pages(site.blog.iter().map(PageAny::Blog));
 
@@ -292,7 +293,7 @@ impl<'a> Renderer<'a> {
 
         let wiki_ctx = WikiIndexContext {
             site: site_ctx.clone(),
-            categories: wiki_categories,
+            categories: wiki_categories.to_vec(),
         };
         pages.insert(
             "/wiki/".into(),

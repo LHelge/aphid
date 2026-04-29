@@ -8,6 +8,10 @@ use crate::content::slug::Slug;
 use crate::content::{PageAny, PageFrontmatter, Site, WikiFrontmatter};
 use crate::markdown::{HeadingEntry, Rendered};
 
+fn owned(value: Option<&str>) -> Option<String> {
+    value.map(str::to_owned)
+}
+
 /// A single nav entry for standalone pages, available to all templates.
 #[derive(Debug, Clone, Serialize)]
 pub struct NavEntry {
@@ -120,8 +124,8 @@ impl PostEntry {
             title: any.title().into_owned(),
             url: any.url_path(),
             created: any.created(),
-            image: any.image().map(String::from),
-            description: any.description().map(String::from),
+            image: owned(any.image()),
+            description: owned(any.description()),
             tags: TagRef::from_tags(any.tags()),
         }
     }
@@ -362,14 +366,14 @@ impl PageContext {
                 .iter()
                 .map(BacklinkEntry::from)
                 .collect(),
-            category: page.category().map(String::from),
+            category: owned(page.category()),
             wiki_categories: match page.kind() {
                 PageKind::Wiki => wiki_categories.to_vec(),
                 _ => Vec::new(),
             },
-            author: page.author().map(String::from),
-            image: page.image().map(String::from),
-            description: page.description().map(String::from),
+            author: owned(page.author()),
+            image: owned(page.image()),
+            description: owned(page.description()),
             created: page.created(),
             updated: page.updated(),
             tags: TagRef::from_tags(page.tags()),
