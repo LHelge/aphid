@@ -17,6 +17,7 @@ use super::state::AppState;
 use super::watcher;
 use crate::Error;
 use crate::config::Config;
+use crate::generated::FaviconSet;
 use crate::render::{RenderedSite, Theme};
 
 /// A configured-but-not-yet-bound HTTP server: the rendered site, the axum
@@ -33,8 +34,15 @@ impl Server {
     pub fn new(config_path: &Path) -> Result<Self, Error> {
         let config = Config::from_path(config_path)?;
         let theme = Theme::load(&config)?;
-        let rendered = RenderedSite::build(&config, &theme, false)?;
-        let state = Arc::new(AppState::new(rendered));
+
+        let favicon = config
+            .favicon
+            .as_ref()
+            .map(|p| FaviconSet::generate(p, &config.title))
+            .transpose()?;
+
+        let rendered = RenderedSite::build_with_favicon(&config, &theme, false, favicon.clone())?;
+        let state = Arc::new(AppState::new(rendered, favicon));
         let router = Self::build_router(Arc::clone(&state), &config);
         Ok(Self {
             state,
@@ -149,11 +157,29 @@ impl Server {
     }
 }
 
-/// Catch-all handler: looks up the request path in the rendered site map
-/// and injects the live-reload script into served HTML.
+/// Catch-all handler: serves root files (favicon, robots.txt, etc.),
+/// then falls back to rendered pages with live-reload script injection.
 async fn handle_page(State(state): State<Arc<AppState>>, req: axum::extract::Request) -> Response {
     let path = req.uri().path().to_string();
     let site = state.site.read().await;
+
+    // Root files (favicon.ico, robots.txt, sitemap.xml, etc.)
+    let filename = path.trim_start_matches('/');
+    if let Some((_, content)) = site.root_files.iter().find(|(name, _)| name == filename) {
+        let content_type = match std::path::Path::new(filename)
+            .extension()
+            .and_then(|e| e.to_str())
+        {
+            Some("ico") => "image/x-icon",
+            Some("png") => "image/png",
+            Some("xml") => "application/xml",
+            Some("txt") => "text/plain; charset=utf-8",
+            Some("webmanifest") => "application/manifest+json",
+            _ => "application/octet-stream",
+        };
+        return ([(header::CONTENT_TYPE, content_type)], content.clone()).into_response();
+    }
+
     match site.lookup(&path) {
         Some(html) => Html(livereload::inject_live_reload(html)).into_response(),
         None => (

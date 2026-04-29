@@ -191,3 +191,151 @@ async fn build_output_does_not_contain_live_reload_script() {
         );
     }
 }
+
+// ── robots.txt & sitemap.xml ────────────────────────────────────────────
+
+#[tokio::test]
+async fn robots_txt_generated() {
+    let (_dir, output) = build_fixture_site().await;
+    let robots = fs::read_to_string(output.join("robots.txt")).unwrap();
+    assert!(robots.contains("User-agent: *"));
+    assert!(robots.contains("Allow: /"));
+    assert!(robots.contains("Sitemap: https://example.com/sitemap.xml"));
+}
+
+#[tokio::test]
+async fn sitemap_xml_generated() {
+    let (_dir, output) = build_fixture_site().await;
+    let sitemap = fs::read_to_string(output.join("sitemap.xml")).unwrap();
+
+    assert!(sitemap.starts_with("<?xml"));
+    assert!(sitemap.contains("<urlset"));
+    // Home, blog index, wiki index should be present
+    assert!(
+        sitemap.contains("<loc>https://example.com/</loc>"),
+        "sitemap should contain home URL"
+    );
+    assert!(
+        sitemap.contains("<loc>https://example.com/blog/</loc>"),
+        "sitemap should contain blog index URL"
+    );
+    assert!(
+        sitemap.contains("<loc>https://example.com/wiki/</loc>"),
+        "sitemap should contain wiki index URL"
+    );
+    // Blog posts should have lastmod
+    assert!(
+        sitemap.contains("<lastmod>"),
+        "blog posts in sitemap should have lastmod"
+    );
+}
+
+// ── Favicon ─────────────────────────────────────────────────────────────
+
+/// Build with a test favicon and verify all generated files.
+#[tokio::test]
+async fn favicon_files_generated() {
+    let dir = TempDir::new().unwrap();
+    let config_path = common::write_fixture_config(dir.path(), &common::fixtures_dir());
+
+    // Create a tiny 4×4 red PNG as the favicon source.
+    let icon_path = dir.path().join("icon.png");
+    write_tiny_png(&icon_path);
+
+    // Add favicon to config
+    append_config(
+        &config_path,
+        &format!("favicon = \"{}\"", icon_path.display()),
+    );
+
+    let output = dir.path().join("dist");
+    write_file(&dir.path().join("static/empty"), "");
+    aphid::build(&config_path, &output).await.unwrap();
+
+    assert!(output.join("favicon.ico").exists(), "favicon.ico missing");
+    assert!(
+        output.join("apple-touch-icon.png").exists(),
+        "apple-touch-icon.png missing"
+    );
+    assert!(
+        output.join("android-chrome-192x192.png").exists(),
+        "android-chrome-192x192.png missing"
+    );
+    assert!(
+        output.join("android-chrome-512x512.png").exists(),
+        "android-chrome-512x512.png missing"
+    );
+    assert!(
+        output.join("site.webmanifest").exists(),
+        "site.webmanifest missing"
+    );
+}
+
+#[tokio::test]
+async fn favicon_html_tags_injected() {
+    let dir = TempDir::new().unwrap();
+    let config_path = common::write_fixture_config(dir.path(), &common::fixtures_dir());
+
+    let icon_path = dir.path().join("icon.png");
+    write_tiny_png(&icon_path);
+    append_config(
+        &config_path,
+        &format!("favicon = \"{}\"", icon_path.display()),
+    );
+
+    let output = dir.path().join("dist");
+    write_file(&dir.path().join("static/empty"), "");
+    aphid::build(&config_path, &output).await.unwrap();
+
+    let html = fs::read_to_string(output.join("blog/first-post/index.html")).unwrap();
+    assert!(
+        html.contains(r#"href="/favicon.ico""#),
+        "favicon.ico link missing from HTML head"
+    );
+    assert!(
+        html.contains(r#"href="/apple-touch-icon.png""#),
+        "apple-touch-icon link missing from HTML head"
+    );
+    assert!(
+        html.contains(r#"href="/site.webmanifest""#),
+        "webmanifest link missing from HTML head"
+    );
+}
+
+#[tokio::test]
+async fn no_favicon_when_not_configured() {
+    let (_dir, output) = build_fixture_site().await;
+    assert!(
+        !output.join("favicon.ico").exists(),
+        "favicon.ico should not exist when favicon is not configured"
+    );
+    assert!(
+        !output.join("apple-touch-icon.png").exists(),
+        "apple-touch-icon.png should not exist when favicon is not configured"
+    );
+
+    // robots.txt and sitemap.xml should still be present
+    assert!(output.join("robots.txt").exists());
+    assert!(output.join("sitemap.xml").exists());
+}
+
+/// Write a tiny 4×4 red PNG for test fixtures.
+fn write_tiny_png(path: &std::path::Path) {
+    use std::io::Cursor;
+    let img = image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(
+        4,
+        4,
+        image::Rgba([255, 0, 0, 255]),
+    ));
+    let mut buf = Cursor::new(Vec::new());
+    img.write_to(&mut buf, image::ImageFormat::Png).unwrap();
+    fs::write(path, buf.into_inner()).unwrap();
+}
+
+fn append_config(config_path: &std::path::Path, extra: &str) {
+    let mut content = fs::read_to_string(config_path).unwrap();
+    content.push('\n');
+    content.push_str(extra);
+    content.push('\n');
+    fs::write(config_path, content).unwrap();
+}

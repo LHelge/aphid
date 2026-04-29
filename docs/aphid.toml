@@ -3,7 +3,7 @@ base_url = "https://aphid.lhelge.se"
 source_dir = "content"
 static_dir = "static"
 theme_dir = "theme"
-
+favicon = "static/favicon.png"
 wiki_categories = ["Getting Started", "Content", "Customization", "Development"]
 
 [[authors]]
