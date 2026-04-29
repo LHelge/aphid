@@ -71,6 +71,14 @@ impl Config {
         Ok(config)
     }
 
+    pub fn normalized_base_url(&self) -> &str {
+        Self::normalize_base_url(&self.base_url)
+    }
+
+    pub fn normalize_base_url(base_url: &str) -> &str {
+        base_url.trim_end_matches('/')
+    }
+
     /// Make all relative directory fields absolute by joining them with `base`.
     fn resolve_paths(&mut self, base: &Path) {
         let resolve = |p: &mut PathBuf| {
@@ -153,5 +161,24 @@ mod tests {
     #[test]
     fn missing_base_url_is_error() {
         assert!(r#"title = "My Site""#.parse::<Config>().is_err());
+    }
+
+    #[test]
+    fn normalized_base_url_strips_trailing_slash() {
+        let with_slash: Config = r#"
+            title = "My Site"
+            base_url = "https://example.com/"
+            "#
+        .parse()
+        .unwrap();
+        let without_slash: Config = r#"
+            title = "My Site"
+            base_url = "https://example.com"
+            "#
+        .parse()
+        .unwrap();
+
+        assert_eq!(with_slash.normalized_base_url(), "https://example.com");
+        assert_eq!(without_slash.normalized_base_url(), "https://example.com");
     }
 }

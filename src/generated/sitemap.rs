@@ -20,7 +20,7 @@ impl Sitemap {
     /// Build a sitemap from the fully-loaded site.
     pub fn new(site: &Site) -> Self {
         tracing::debug!("generating sitemap.xml");
-        let base = site.config.base_url.trim_end_matches('/');
+        let base = site.config.normalized_base_url();
         let mut entries = Vec::new();
 
         // Home
