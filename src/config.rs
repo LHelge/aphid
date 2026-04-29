@@ -79,21 +79,24 @@ impl Config {
         base_url.trim_end_matches('/')
     }
 
+    fn resolve_path(path: &mut PathBuf, base: &Path) {
+        if path.is_relative() {
+            *path = base.join(&*path);
+        }
+    }
+
+    fn resolve_optional_path(path: &mut Option<PathBuf>, base: &Path) {
+        if let Some(path) = path {
+            Self::resolve_path(path, base);
+        }
+    }
+
     /// Make all relative directory fields absolute by joining them with `base`.
     fn resolve_paths(&mut self, base: &Path) {
-        let resolve = |p: &mut PathBuf| {
-            if p.is_relative() {
-                *p = base.join(&*p);
-            }
-        };
-        resolve(&mut self.source_dir);
-        resolve(&mut self.static_dir);
-        if let Some(ref mut d) = self.theme_dir {
-            resolve(d);
-        }
-        if let Some(ref mut f) = self.favicon {
-            resolve(f);
-        }
+        Self::resolve_path(&mut self.source_dir, base);
+        Self::resolve_path(&mut self.static_dir, base);
+        Self::resolve_optional_path(&mut self.theme_dir, base);
+        Self::resolve_optional_path(&mut self.favicon, base);
     }
 }
 

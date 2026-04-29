@@ -81,16 +81,7 @@ impl Server {
     /// Bind on `127.0.0.1:0` and spawn the server in a background task. No
     /// file watcher and no signal handling — for integration tests.
     pub async fn spawn_test(self) -> Result<(u16, Arc<AppState>, JoinHandle<()>), Error> {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
-        let port = listener.local_addr()?.port();
-        let state = Arc::clone(&self.state);
-        let router = self.router;
-
-        let handle = tokio::spawn(async move {
-            axum::serve(listener, router).await.ok();
-        });
-
-        Ok((port, state, handle))
+        self.spawn_test_server().await
     }
 
     /// Like `spawn_test` but also starts the file watcher. Returns
@@ -100,7 +91,12 @@ impl Server {
         self,
     ) -> Result<(u16, Arc<AppState>, JoinHandle<()>, JoinHandle<()>), Error> {
         let watcher_handle = self.start_watcher()?;
+        let (port, state, server_handle) = self.spawn_test_server().await?;
 
+        Ok((port, state, server_handle, watcher_handle))
+    }
+
+    async fn spawn_test_server(self) -> Result<(u16, Arc<AppState>, JoinHandle<()>), Error> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let port = listener.local_addr()?.port();
         let state = Arc::clone(&self.state);
@@ -110,7 +106,7 @@ impl Server {
             axum::serve(listener, router).await.ok();
         });
 
-        Ok((port, state, server_handle, watcher_handle))
+        Ok((port, state, server_handle))
     }
 
     /// Spawn the file watcher in a background task. Used by both
