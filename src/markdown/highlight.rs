@@ -4,6 +4,8 @@ use syntect::html::{ClassStyle, ClassedHTMLGenerator};
 use syntect::parsing::{SyntaxDefinition, SyntaxSet};
 use syntect::util::LinesWithEndings;
 
+use crate::html::escape_html;
+
 static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
 
 const CLASS_STYLE: ClassStyle = ClassStyle::SpacedPrefixed { prefix: "hl-" };
@@ -106,9 +108,7 @@ impl Highlighter {
             {
                 return format!(
                     "<pre class=\"code-block\"><code>{}</code></pre>",
-                    code.replace('&', "&amp;")
-                        .replace('<', "&lt;")
-                        .replace('>', "&gt;")
+                    escape_html(code)
                 );
             }
         }
