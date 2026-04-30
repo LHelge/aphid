@@ -85,7 +85,6 @@ a:hover {
 /* ── Prose ──────────────────────────────────────────────────────────────── */
 .prose {
   overflow-wrap: break-word;
-  word-break: break-word;
 }
 
 .prose h1,
