@@ -41,7 +41,8 @@ impl Server {
             .map(|p| FaviconSet::generate(p, &config.title))
             .transpose()?;
 
-        let rendered = RenderedSite::build_with_favicon(&config, &theme, Mode::Serve, favicon.clone())?;
+        let rendered =
+            RenderedSite::build_with_favicon(&config, &theme, Mode::Serve, favicon.clone())?;
         let state = Arc::new(AppState::new(rendered, favicon));
         let router = Self::build_router(Arc::clone(&state), &config);
         Ok(Self {

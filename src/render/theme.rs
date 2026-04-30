@@ -30,6 +30,7 @@ const DEFAULT_WIKI_INDEX: &str = include_str!("../../default-theme/templates/wik
 const DEFAULT_PAGE: &str = include_str!("../../default-theme/templates/page.html");
 const DEFAULT_TAG: &str = include_str!("../../default-theme/templates/tag.html");
 const DEFAULT_TAGS_INDEX: &str = include_str!("../../default-theme/templates/tags_index.html");
+const DEFAULT_PAGINATION: &str = include_str!("../../default-theme/templates/pagination.html");
 const DEFAULT_404: &str = include_str!("../../default-theme/templates/404.html");
 
 // Embedded default theme static files (relative path → content).
@@ -85,6 +86,7 @@ impl Default for Theme {
             ("page.html", DEFAULT_PAGE),
             ("tag.html", DEFAULT_TAG),
             ("tags_index.html", DEFAULT_TAGS_INDEX),
+            ("pagination.html", DEFAULT_PAGINATION),
             ("404.html", DEFAULT_404),
         ];
         for (name, content) in templates {

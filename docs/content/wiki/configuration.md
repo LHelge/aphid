@@ -24,6 +24,7 @@ tags:
 | `theme_dir` | *(embedded)* | Path to a custom theme directory |
 | `wiki_categories` | `[]` | Order for wiki category headings — see [Wiki category order](#wiki-category-order) |
 | `feed_limit` | `20` | Maximum number of blog posts in RSS/Atom feeds. Set to `0` to include all posts |
+| `posts_per_page` | `10` | Posts shown per page on the blog index and tag pages — see [[pagination]] |
 
 All path fields are resolved relative to the directory containing `aphid.toml`, so the same paths work regardless of which directory you invoke `aphid` from. For example, `aphid --config docs/aphid.toml build` looks for content in `docs/content/` even when run from the repo root.
 

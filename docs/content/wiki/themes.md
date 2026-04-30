@@ -99,6 +99,8 @@ These come from `base.html` and are available in all templates via inheritance:
 | `created` | string? | Publication date, formatted `YYYY-MM-DD` |
 | `updated` | string? | Last-edited date |
 | `tags` | list | Each tag has `name` and `slug` |
+| `newer_post` | object? | Adjacent post one step newer in the feed, or `null` on the newest post. Same shape as the post entries on `blog_index.html`. |
+| `older_post` | object? | Adjacent post one step older in the feed, or `null` on the oldest post. Same shape. |
 
 ## wiki_page.html
 
@@ -124,11 +126,12 @@ Renders the site root (`/index.html`). Receives the post list plus an optional r
 
 ## blog_index.html
 
-Renders the blog listing at `/blog/`.
+Renders one page of the blog listing. Page 1 lives at `/blog/`; subsequent pages live at `/blog/page/2/`, `/blog/page/3/`, … See [[pagination]] for the full mechanics.
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `posts` | list | All blog posts — see the post entry shape below |
+| `posts` | list | Posts on the current page — see the post entry shape below |
+| `pagination` | object? | Pagination state, or `null` when the entire listing fits on one page. See [[pagination]]. |
 
 ### Post entry shape
 
@@ -151,11 +154,14 @@ Each entry in `posts` (and on `tag.html`) has:
 
 ## tag.html
 
+Renders one page of a tag's post listing. Page 1 lives at `/tags/{slug}/`; subsequent pages live at `/tags/{slug}/page/2/`, etc.
+
 | Variable | Type | Description |
 |----------|------|-------------|
 | `tag` | string | Tag display name |
 | `tag_slug` | string | URL-safe slug |
-| `posts` | list | Tagged posts; each has `title`, `url`, and `created?` |
+| `posts` | list | Tagged posts on the current page; each has `title`, `url`, `created?` |
+| `pagination` | object? | Pagination state, or `null` when the entire tag fits on one page. See [[pagination]]. |
 
 ## tags_index.html
 

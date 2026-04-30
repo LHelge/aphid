@@ -241,6 +241,7 @@ impl<'a> Renderer<'a> {
     ) -> Result<HashMap<String, String>, Error> {
         let mut pages = HashMap::new();
         let mut all_tags: Vec<TagEntry> = Vec::new();
+        let per_page = site.config.posts_per_page.max(1);
 
         for (tag, slugs) in &site.tag_index {
             let posts = PostEntry::from_pages(slugs.iter().filter_map(|slug| site.get(slug)));
@@ -249,14 +250,27 @@ impl<'a> Renderer<'a> {
             let tag_slug = tag_entry.slug.clone();
             all_tags.push(tag_entry);
 
-            let ctx = TagPageContext {
-                site: site_ctx.clone(),
-                tag: tag.clone(),
-                tag_slug: tag_slug.clone(),
-                posts,
-            };
-            let html = self.render_template("tag.html", &ctx)?;
-            pages.insert(format!("/tags/{tag_slug}/"), html);
+            let base_path = format!("/tags/{tag_slug}/");
+            let chunks = paginate(&posts, per_page);
+            let total = chunks.len();
+            for (i, chunk) in chunks.iter().enumerate() {
+                let current = i + 1;
+                let pagination = Pagination::build(&base_path, current, total);
+                let ctx = TagPageContext {
+                    site: site_ctx.clone(),
+                    tag: tag.clone(),
+                    tag_slug: tag_slug.clone(),
+                    posts: chunk.to_vec(),
+                    pagination,
+                };
+                let html = self.render_template("tag.html", &ctx)?;
+                let url = if current == 1 {
+                    base_path.clone()
+                } else {
+                    format!("{base_path}page/{current}/")
+                };
+                pages.insert(url, html);
+            }
         }
 
         all_tags.sort_by(|a, b| a.name.cmp(&b.name));
@@ -280,6 +294,7 @@ impl<'a> Renderer<'a> {
         let mut pages = HashMap::new();
 
         let posts = PostEntry::from_pages(site.blog.iter().map(PageAny::Blog));
+        let per_page = site.config.posts_per_page.max(1);
 
         let home_rendered = site.home.as_ref().and(rendered.home.as_ref());
         let home_content = home_rendered.map(HomeContent::from);
@@ -292,14 +307,23 @@ impl<'a> Renderer<'a> {
         };
         pages.insert("/".into(), self.render_template("home.html", &home_ctx)?);
 
-        let blog_ctx = BlogIndexContext {
-            site: site_ctx.clone(),
-            posts,
-        };
-        pages.insert(
-            "/blog/".into(),
-            self.render_template("blog_index.html", &blog_ctx)?,
-        );
+        let chunks = paginate(&posts, per_page);
+        let total = chunks.len();
+        for (i, chunk) in chunks.iter().enumerate() {
+            let current = i + 1;
+            let pagination = Pagination::build("/blog/", current, total);
+            let blog_ctx = BlogIndexContext {
+                site: site_ctx.clone(),
+                posts: chunk.to_vec(),
+                pagination,
+            };
+            let url = if current == 1 {
+                "/blog/".to_string()
+            } else {
+                format!("/blog/page/{current}/")
+            };
+            pages.insert(url, self.render_template("blog_index.html", &blog_ctx)?);
+        }
 
         let wiki_ctx = WikiIndexContext {
             site: site_ctx.clone(),
@@ -320,10 +344,20 @@ impl<'a> Renderer<'a> {
     }
 }
 
+/// Split `items` into chunks of `per_page`, always yielding at least one
+/// (possibly empty) slice so the canonical page exists for an empty list.
+/// Caller must ensure `per_page >= 1`.
+fn paginate<T>(items: &[T], per_page: usize) -> Vec<&[T]> {
+    if items.is_empty() {
+        return vec![&[]];
+    }
+    items.chunks(per_page).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::content::page::PageKind;
+    use crate::content::page::{Page, PageKind};
 
     #[test]
     fn page_context_selects_correct_template() {
@@ -357,6 +391,8 @@ mod tests {
                 name: "rust".into(),
                 slug: "rust".into(),
             }],
+            newer_post: None,
+            older_post: None,
         };
         assert_eq!(ctx.template_name(), "blog_post.html");
 
@@ -416,11 +452,166 @@ mod tests {
             created: Some("2026-01-01".into()),
             updated: None,
             tags: vec![],
+            newer_post: None,
+            older_post: None,
         };
 
         let html = renderer.render_template(ctx.template_name(), &ctx).unwrap();
         assert!(html.contains("<h1>My Post</h1>"));
         assert!(html.contains("<p>Body here</p>"));
+    }
+
+    #[test]
+    fn paginate_empty_yields_one_empty_page() {
+        let chunks = paginate::<i32>(&[], 5);
+        assert_eq!(chunks.len(), 1);
+        assert!(chunks[0].is_empty());
+    }
+
+    #[test]
+    fn paginate_splits_into_chunks() {
+        let items = [1, 2, 3, 4, 5, 6, 7];
+        let chunks = paginate(&items, 3);
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0], &[1, 2, 3]);
+        assert_eq!(chunks[1], &[4, 5, 6]);
+        assert_eq!(chunks[2], &[7]);
+    }
+
+    fn make_blog_post(slug: &str, year: i32, day: u32) -> Page<crate::content::BlogFrontmatter> {
+        use crate::content::BlogFrontmatter;
+        use chrono::NaiveDate;
+        use std::path::PathBuf;
+        Page {
+            slug: slug.into(),
+            body: String::new(),
+            path: PathBuf::from(format!("content/blog/{slug}.md")),
+            frontmatter: BlogFrontmatter {
+                title: format!("Post {slug}"),
+                slug: slug.into(),
+                author: "Tester".into(),
+                created: NaiveDate::from_ymd_opt(year, 1, day).unwrap(),
+                updated: None,
+                image: None,
+                description: None,
+                tags: vec!["rust".into()],
+            },
+        }
+    }
+
+    fn theme_with_stub_blog_index() -> Theme {
+        let mut tera = tera::Tera::default();
+        tera.add_raw_template(
+            "blog_index.html",
+            "{% if pagination %}page {{ pagination.current }}/{{ pagination.total }}{% else %}single{% endif %}: {% for p in posts %}{{ p.title }};{% endfor %}",
+        )
+        .unwrap();
+        tera.add_raw_template("home.html", "home").unwrap();
+        tera.add_raw_template("wiki_index.html", "wiki").unwrap();
+        tera.add_raw_template(
+            "tag.html",
+            "{% if pagination %}p{{ pagination.current }}/{{ pagination.total }}{% else %}single{% endif %}: {% for p in posts %}{{ p.title }};{% endfor %}",
+        )
+        .unwrap();
+        tera.add_raw_template("tags_index.html", "tags").unwrap();
+        Theme {
+            meta: theme::ThemeMeta {
+                name: "test".into(),
+                version: "0.1.0".into(),
+                description: None,
+            },
+            tera,
+            static_dir: None,
+            embedded_static: vec![],
+        }
+    }
+
+    fn site_ctx_for_test() -> SiteContext {
+        SiteContext {
+            site_title: "Test".into(),
+            base_url: "http://localhost".into(),
+            version: "0.0.0".into(),
+            nav_pages: vec![],
+            socials: vec![],
+            favicon_tags: String::new(),
+            feed_atom_url: "/feed.xml".into(),
+            feed_rss_url: "/rss.xml".into(),
+        }
+    }
+
+    #[test]
+    fn blog_index_paginates_into_multiple_pages() {
+        let blog: Vec<_> = (0..25)
+            .map(|i| make_blog_post(&format!("post-{i:02}"), 2026, (i % 28 + 1) as u32))
+            .collect();
+        let mut config: Config = "title = \"T\"\nbase_url = \"http://x\"".parse().unwrap();
+        config.posts_per_page = 10;
+        let mut site = Site::from_parts(config, blog, vec![], vec![]).unwrap();
+        site.blog.sort();
+
+        let theme = theme_with_stub_blog_index();
+        let renderer = Renderer::new(&theme);
+        let rendered = Renderer::render_markdown(&site);
+        let pages = renderer
+            .render_index_pages(&site, &rendered, &site_ctx_for_test(), &[])
+            .unwrap();
+
+        assert!(pages.contains_key("/blog/"));
+        assert!(pages.contains_key("/blog/page/2/"));
+        assert!(pages.contains_key("/blog/page/3/"));
+        assert!(!pages.contains_key("/blog/page/1/"));
+        assert!(!pages.contains_key("/blog/page/4/"));
+
+        let p1 = pages.get("/blog/").unwrap();
+        assert!(p1.starts_with("page 1/3:"));
+        let p3 = pages.get("/blog/page/3/").unwrap();
+        assert!(p3.starts_with("page 3/3:"));
+    }
+
+    #[test]
+    fn blog_index_skips_pagination_when_under_limit() {
+        let blog: Vec<_> = (0..3)
+            .map(|i| make_blog_post(&format!("post-{i:02}"), 2026, (i + 1) as u32))
+            .collect();
+        let mut config: Config = "title = \"T\"\nbase_url = \"http://x\"".parse().unwrap();
+        config.posts_per_page = 10;
+        let mut site = Site::from_parts(config, blog, vec![], vec![]).unwrap();
+        site.blog.sort();
+
+        let theme = theme_with_stub_blog_index();
+        let renderer = Renderer::new(&theme);
+        let rendered = Renderer::render_markdown(&site);
+        let pages = renderer
+            .render_index_pages(&site, &rendered, &site_ctx_for_test(), &[])
+            .unwrap();
+
+        assert!(pages.contains_key("/blog/"));
+        assert!(!pages.keys().any(|k| k.starts_with("/blog/page/")));
+        let p1 = pages.get("/blog/").unwrap();
+        assert!(p1.starts_with("single:"));
+    }
+
+    #[test]
+    fn tag_pages_paginate_with_correct_urls() {
+        let blog: Vec<_> = (0..12)
+            .map(|i| make_blog_post(&format!("post-{i:02}"), 2026, (i + 1) as u32))
+            .collect();
+        let mut config: Config = "title = \"T\"\nbase_url = \"http://x\"".parse().unwrap();
+        config.posts_per_page = 5;
+        let mut site = Site::from_parts(config, blog, vec![], vec![]).unwrap();
+        site.blog.sort();
+
+        let theme = theme_with_stub_blog_index();
+        let renderer = Renderer::new(&theme);
+        let pages = renderer
+            .render_tag_pages(&site, &site_ctx_for_test())
+            .unwrap();
+
+        assert!(pages.contains_key("/tags/rust/"));
+        assert!(pages.contains_key("/tags/rust/page/2/"));
+        assert!(pages.contains_key("/tags/rust/page/3/"));
+        assert!(!pages.contains_key("/tags/rust/page/1/"));
+        assert!(!pages.contains_key("/tags/rust/page/4/"));
     }
 
     #[test]

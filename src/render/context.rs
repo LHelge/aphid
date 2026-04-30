@@ -139,12 +139,65 @@ impl PostEntry {
     }
 }
 
-/// Context for the blog index page (list of all posts).
+/// A single page link in the paginator's numeric nav.
+#[derive(Debug, Clone, Serialize)]
+pub struct PageLink {
+    pub n: usize,
+    pub url: String,
+}
+
+/// Pagination state for index-style pages (blog index, tag pages).
+///
+/// `current` and `total` are 1-indexed. `prev_url` / `next_url` are
+/// `None` at the boundaries. `pages` carries every page's URL so
+/// templates can render numeric nav.
+#[derive(Debug, Clone, Serialize)]
+pub struct Pagination {
+    pub current: usize,
+    pub total: usize,
+    pub prev_url: Option<String>,
+    pub next_url: Option<String>,
+    pub pages: Vec<PageLink>,
+}
+
+impl Pagination {
+    /// Build pagination state for the page at `current` (1-indexed) of
+    /// `total` pages, all under `base_path` (which must end with `/`,
+    /// e.g. `/blog/` or `/tags/rust/`).
+    ///
+    /// Returns `None` when there is only one page — templates use that
+    /// to hide the nav UI entirely.
+    pub fn build(base_path: &str, current: usize, total: usize) -> Option<Self> {
+        if total <= 1 {
+            return None;
+        }
+        let url_for = |n: usize| {
+            if n == 1 {
+                base_path.to_string()
+            } else {
+                format!("{base_path}page/{n}/")
+            }
+        };
+        let pages = (1..=total)
+            .map(|n| PageLink { n, url: url_for(n) })
+            .collect();
+        Some(Self {
+            current,
+            total,
+            prev_url: (current > 1).then(|| url_for(current - 1)),
+            next_url: (current < total).then(|| url_for(current + 1)),
+            pages,
+        })
+    }
+}
+
+/// Context for the blog index page (list of posts on one paginated page).
 #[derive(Debug, Serialize)]
 pub struct BlogIndexContext {
     #[serde(flatten)]
     pub site: SiteContext,
     pub posts: Vec<PostEntry>,
+    pub pagination: Option<Pagination>,
 }
 
 /// Rendered home-page content from `content/home.md`, exposed to the
@@ -258,7 +311,7 @@ pub struct WikiIndexContext {
     pub categories: Vec<WikiCategory>,
 }
 
-/// Context for a single tag page (posts with that tag).
+/// Context for a single tag page (posts with that tag, paginated).
 #[derive(Debug, Serialize)]
 pub struct TagPageContext {
     #[serde(flatten)]
@@ -266,6 +319,7 @@ pub struct TagPageContext {
     pub tag: String,
     pub tag_slug: Slug,
     pub posts: Vec<PostEntry>,
+    pub pagination: Option<Pagination>,
 }
 
 /// A tag summary for the tags index listing.
@@ -366,6 +420,12 @@ pub struct PageContext {
     pub created: Option<String>,
     pub updated: Option<String>,
     pub tags: Vec<TagRef>,
+    /// Adjacent post one step newer than this one in the blog feed.
+    /// `None` on non-blog pages and on the newest blog post.
+    pub newer_post: Option<PostEntry>,
+    /// Adjacent post one step older than this one in the blog feed.
+    /// `None` on non-blog pages and on the oldest blog post.
+    pub older_post: Option<PostEntry>,
 }
 
 impl PageContext {
@@ -376,6 +436,7 @@ impl PageContext {
         site_ctx: &SiteContext,
         wiki_categories: &[WikiCategory],
     ) -> Self {
+        let (newer_post, older_post) = blog_neighbours(page, site);
         Self {
             site: site_ctx.clone(),
             title: page.title().into_owned(),
@@ -400,12 +461,37 @@ impl PageContext {
             created: page.created(),
             updated: page.updated(),
             tags: TagRef::from_tags(page.tags()),
+            newer_post,
+            older_post,
         }
     }
 
     pub(super) fn template_name(&self) -> &'static str {
         self.kind.template_name()
     }
+}
+
+/// Find the posts one step newer and one step older than `page` in the
+/// blog feed. Returns `(None, None)` for non-blog pages.
+///
+/// `Site::blog` is sorted newest-first, so the newer neighbour is at
+/// index `i - 1` and the older at `i + 1`.
+fn blog_neighbours(page: &PageAny<'_>, site: &Site) -> (Option<PostEntry>, Option<PostEntry>) {
+    if page.kind() != PageKind::Blog {
+        return (None, None);
+    }
+    let Some(idx) = site.blog.iter().position(|p| &p.slug == page.slug()) else {
+        return (None, None);
+    };
+    let newer = idx
+        .checked_sub(1)
+        .and_then(|i| site.blog.get(i))
+        .map(|p| PostEntry::from_page(&PageAny::Blog(p)));
+    let older = site
+        .blog
+        .get(idx + 1)
+        .map(|p| PostEntry::from_page(&PageAny::Blog(p)));
+    (newer, older)
 }
 
 #[cfg(test)]
@@ -461,6 +547,122 @@ mod tests {
                 None,
             ]
         );
+    }
+
+    #[test]
+    fn pagination_single_page_is_none() {
+        assert!(Pagination::build("/blog/", 1, 1).is_none());
+        assert!(Pagination::build("/blog/", 1, 0).is_none());
+    }
+
+    #[test]
+    fn pagination_first_page_has_no_prev() {
+        let p = Pagination::build("/blog/", 1, 3).unwrap();
+        assert_eq!(p.current, 1);
+        assert_eq!(p.total, 3);
+        assert!(p.prev_url.is_none());
+        assert_eq!(p.next_url.as_deref(), Some("/blog/page/2/"));
+        let urls: Vec<_> = p.pages.iter().map(|l| l.url.as_str()).collect();
+        assert_eq!(urls, vec!["/blog/", "/blog/page/2/", "/blog/page/3/"]);
+    }
+
+    #[test]
+    fn pagination_last_page_has_no_next() {
+        let p = Pagination::build("/blog/", 3, 3).unwrap();
+        assert_eq!(p.prev_url.as_deref(), Some("/blog/page/2/"));
+        assert!(p.next_url.is_none());
+    }
+
+    #[test]
+    fn pagination_middle_page_has_both() {
+        let p = Pagination::build("/blog/", 2, 3).unwrap();
+        assert_eq!(p.prev_url.as_deref(), Some("/blog/"));
+        assert_eq!(p.next_url.as_deref(), Some("/blog/page/3/"));
+    }
+
+    fn blog_post_for_test(slug: &str, day: u32) -> Page<crate::content::BlogFrontmatter> {
+        use crate::content::BlogFrontmatter;
+        use chrono::NaiveDate;
+        Page {
+            slug: slug.into(),
+            body: String::new(),
+            path: PathBuf::from(format!("content/blog/{slug}.md")),
+            frontmatter: BlogFrontmatter {
+                title: format!("Post {slug}"),
+                slug: slug.into(),
+                author: "T".into(),
+                created: NaiveDate::from_ymd_opt(2026, 1, day).unwrap(),
+                updated: None,
+                image: None,
+                description: None,
+                tags: vec![],
+            },
+        }
+    }
+
+    fn site_with_blog(posts: Vec<Page<crate::content::BlogFrontmatter>>) -> Site {
+        let config: Config = "title = \"T\"\nbase_url = \"http://x\"".parse().unwrap();
+        let mut site = Site::from_parts(config, posts, vec![], vec![]).unwrap();
+        site.blog.sort();
+        site
+    }
+
+    #[test]
+    fn blog_neighbours_for_middle_post() {
+        let site = site_with_blog(vec![
+            blog_post_for_test("a", 1),
+            blog_post_for_test("b", 2),
+            blog_post_for_test("c", 3),
+        ]);
+        let middle = PageAny::Blog(site.blog.iter().find(|p| p.slug.as_ref() == "b").unwrap());
+        let (newer, older) = blog_neighbours(&middle, &site);
+        assert_eq!(newer.unwrap().title, "Post c");
+        assert_eq!(older.unwrap().title, "Post a");
+    }
+
+    #[test]
+    fn blog_neighbours_newest_has_no_newer() {
+        let site = site_with_blog(vec![blog_post_for_test("a", 1), blog_post_for_test("b", 2)]);
+        let newest = PageAny::Blog(&site.blog[0]);
+        let (newer, older) = blog_neighbours(&newest, &site);
+        assert!(newer.is_none());
+        assert!(older.is_some());
+    }
+
+    #[test]
+    fn blog_neighbours_oldest_has_no_older() {
+        let site = site_with_blog(vec![blog_post_for_test("a", 1), blog_post_for_test("b", 2)]);
+        let oldest = PageAny::Blog(&site.blog[1]);
+        let (newer, older) = blog_neighbours(&oldest, &site);
+        assert!(newer.is_some());
+        assert!(older.is_none());
+    }
+
+    #[test]
+    fn blog_neighbours_single_post_has_no_neighbours() {
+        let site = site_with_blog(vec![blog_post_for_test("only", 1)]);
+        let only = PageAny::Blog(&site.blog[0]);
+        let (newer, older) = blog_neighbours(&only, &site);
+        assert!(newer.is_none());
+        assert!(older.is_none());
+    }
+
+    #[test]
+    fn blog_neighbours_returns_none_for_wiki_page() {
+        let site = site_with_blog(vec![blog_post_for_test("a", 1)]);
+        let wiki = wiki_page("w", None);
+        let any = PageAny::Wiki(&wiki);
+        let (newer, older) = blog_neighbours(&any, &site);
+        assert!(newer.is_none());
+        assert!(older.is_none());
+    }
+
+    #[test]
+    fn pagination_works_for_tag_base_path() {
+        let p = Pagination::build("/tags/rust/", 1, 2).unwrap();
+        assert_eq!(p.next_url.as_deref(), Some("/tags/rust/page/2/"));
+        let urls: Vec<_> = p.pages.iter().map(|l| l.url.as_str()).collect();
+        assert_eq!(urls, vec!["/tags/rust/", "/tags/rust/page/2/"]);
     }
 
     #[test]

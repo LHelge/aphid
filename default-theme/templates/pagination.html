@@ -1,0 +1,19 @@
+<nav class="pagination" aria-label="Pagination">
+    {% if pagination.prev_url %}
+    <a class="pagination-prev" rel="prev" href="{{ pagination.prev_url | safe }}">&larr; Newer</a>
+    {% endif %}
+    <ol class="pagination-pages">
+        {% for link in pagination.pages %}
+        <li>
+            {% if link.n == pagination.current %}
+            <span class="pagination-current" aria-current="page">{{ link.n }}</span>
+            {% else %}
+            <a href="{{ link.url | safe }}">{{ link.n }}</a>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ol>
+    {% if pagination.next_url %}
+    <a class="pagination-next" rel="next" href="{{ pagination.next_url | safe }}">Older &rarr;</a>
+    {% endif %}
+</nav>

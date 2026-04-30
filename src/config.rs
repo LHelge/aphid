@@ -26,6 +26,10 @@ fn default_feed_limit() -> usize {
     20
 }
 
+fn default_posts_per_page() -> usize {
+    10
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub title: String,
@@ -55,6 +59,11 @@ pub struct Config {
     /// to include all posts. Defaults to 20.
     #[serde(default = "default_feed_limit")]
     pub feed_limit: usize,
+    /// Maximum number of posts shown per page on the blog index and tag
+    /// pages. Page 1 stays at the canonical URL (`/blog/`,
+    /// `/tags/{tag}/`); subsequent pages live under `page/N/`. Defaults to 10.
+    #[serde(default = "default_posts_per_page")]
+    pub posts_per_page: usize,
 }
 
 impl std::str::FromStr for Config {
@@ -131,6 +140,8 @@ mod tests {
         assert!(cfg.authors.is_empty());
         assert!(cfg.socials.is_empty());
         assert!(cfg.wiki_categories.is_empty());
+        assert_eq!(cfg.feed_limit, 20);
+        assert_eq!(cfg.posts_per_page, 10);
     }
 
     #[test]
@@ -141,6 +152,8 @@ mod tests {
             source_dir = "src_content"
             theme_dir = "tmpl"
             static_dir = "assets"
+            feed_limit = 5
+            posts_per_page = 3
 
             [[authors]]
             name = "Alice"
@@ -165,6 +178,8 @@ mod tests {
         assert!(cfg.authors[1].email.is_none());
         assert_eq!(cfg.socials.len(), 1);
         assert_eq!(cfg.socials[0].platform, "github");
+        assert_eq!(cfg.feed_limit, 5);
+        assert_eq!(cfg.posts_per_page, 3);
     }
 
     #[test]

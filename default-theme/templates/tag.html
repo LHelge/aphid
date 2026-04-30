@@ -12,4 +12,4 @@
     </li>
     {% endfor %}
 </ul>
-{% endblock content %}
+{% if pagination %}{% include "pagination.html" %}{% endif %}{% endblock content %}

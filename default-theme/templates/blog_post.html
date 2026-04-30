@@ -37,5 +37,24 @@
             {{ content | safe }}
         </div>
     </div>
+
+    {% if newer_post or older_post %}
+    <nav class="post-nav" aria-label="Adjacent posts">
+        {% if newer_post %}
+        <a class="post-nav-newer" rel="prev" href="{{ newer_post.url | safe }}">
+            <span class="post-nav-label">&larr; Newer</span>
+            <span class="post-nav-title">{{ newer_post.title }}</span>
+            {% if newer_post.created %}<time>{{ newer_post.created }}</time>{% endif %}
+        </a>
+        {% endif %}
+        {% if older_post %}
+        <a class="post-nav-older" rel="next" href="{{ older_post.url | safe }}">
+            <span class="post-nav-label">Older &rarr;</span>
+            <span class="post-nav-title">{{ older_post.title }}</span>
+            {% if older_post.created %}<time>{{ older_post.created }}</time>{% endif %}
+        </a>
+        {% endif %}
+    </nav>
+    {% endif %}
 </article>
 {% endblock content %}

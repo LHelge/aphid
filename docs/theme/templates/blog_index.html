@@ -5,43 +5,35 @@
 {% block content %}
 <div class="blog-section">
   {% if posts | length > 0 %}
-    {% set featured = posts | first %}
-    <a href="{{ featured.url }}" class="post-featured">
-      <div class="post-featured-meta">
-        <span class="post-featured-badge">Latest</span>
-        {% if featured.created %}<span class="post-featured-date">{{ featured.created }}</span>{% endif %}
-      </div>
-      {% if featured.image %}
-      <img src="{{ featured.image }}" alt="" class="post-featured-image">
-      {% endif %}
-      {% if featured.tags %}
-      <div class="post-featured-tags">
-        {% for tag in featured.tags %}
-        <span class="tag-badge">{{ tag.name }}</span>
-        {% endfor %}
-      </div>
-      {% endif %}
-      <h2 class="post-featured-title">{{ featured.title }}</h2>
-      {% if featured.description %}<p class="post-featured-excerpt">{{ featured.description }}</p>{% endif %}
-    </a>
-
-    {% for post in posts | slice(start=1) %}
-    <a href="{{ post.url }}" class="post-card-compact{% if not post.image %} post-card-compact-no-image{% endif %}">
-      {% if post.image %}
-      <img src="{{ post.image }}" alt="" class="post-card-compact-image">
-      {% endif %}
-      <div class="post-card-compact-content">
-        <div class="post-card-compact-meta">
-          {% for tag in post.tags %}
-          <span class="tag-badge">{{ tag.name }}</span>
-          {% endfor %}
-          {% if post.created %}<span class="post-card-compact-date">{{ post.created }}</span>{% endif %}
+    {% if not pagination or pagination.current == 1 %}
+      {% set featured = posts | first %}
+      <article class="post-featured">
+        <div class="post-featured-meta">
+          <span class="post-featured-badge">Latest</span>
+          {% if featured.created %}<span class="post-featured-date">{{ featured.created }}</span>{% endif %}
         </div>
-        <h3 class="post-card-compact-title">{{ post.title }}</h3>
-        {% if post.description %}<p class="post-card-compact-excerpt">{{ post.description }}</p>{% endif %}
-      </div>
-    </a>
-    {% endfor %}
+        {% if featured.image %}
+        <img src="{{ featured.image }}" alt="" class="post-featured-image">
+        {% endif %}
+        {% if featured.tags %}
+        <div class="post-featured-tags">
+          {% for tag in featured.tags %}
+          <a href="/tags/{{ tag.slug }}/" class="tag-badge">{{ tag.name }}</a>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <h2 class="post-featured-title"><a href="{{ featured.url }}" class="post-card-link">{{ featured.title }}</a></h2>
+        {% if featured.description %}<p class="post-featured-excerpt">{{ featured.description }}</p>{% endif %}
+      </article>
+
+      {% for post in posts | slice(start=1) %}
+      {% include "_post_card_compact.html" %}
+      {% endfor %}
+    {% else %}
+      {% for post in posts %}
+      {% include "_post_card_compact.html" %}
+      {% endfor %}
+    {% endif %}
   {% endif %}
 </div>
-{% endblock content %}
+{% if pagination %}{% include "pagination.html" %}{% endif %}{% endblock content %}
