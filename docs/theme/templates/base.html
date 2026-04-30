@@ -10,6 +10,9 @@
     href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
+  {{ favicon_tags | safe }}
+  <link rel="alternate" type="application/atom+xml" title="{{ site_title }} - Atom" href="{{ feed_atom_url }}">
+  <link rel="alternate" type="application/rss+xml" title="{{ site_title }} - RSS" href="{{ feed_rss_url }}">
 </head>
 
 <body>
@@ -67,6 +70,8 @@
         {% for s in socials %}
         <a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.platform }}</a>
         {% endfor %}
+        <a href="{{ feed_atom_url }}">Atom</a>
+        <a href="{{ feed_rss_url }}">RSS</a>
       </div>
     </div>
   </footer>

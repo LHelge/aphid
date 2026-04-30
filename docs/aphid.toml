@@ -1,5 +1,6 @@
 title = "aphid"
 base_url = "https://aphid.lhelge.se"
+description = "A CLI static site generator for blogs, wikis, and pages"
 source_dir = "content"
 static_dir = "static"
 theme_dir = "theme"

@@ -22,10 +22,17 @@ pub struct Social {
     pub url: String,
 }
 
+fn default_feed_limit() -> usize {
+    20
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub title: String,
     pub base_url: String,
+    /// Short site description used as the Atom `<subtitle>` and RSS
+    /// `<channel><description>`.
+    pub description: Option<String>,
     #[serde(default = "default_source_dir")]
     pub source_dir: PathBuf,
     pub theme_dir: Option<PathBuf>,
@@ -44,6 +51,10 @@ pub struct Config {
     /// Path to a source image (PNG, JPEG, SVG, etc.) used to generate
     /// favicons at standard sizes.
     pub favicon: Option<PathBuf>,
+    /// Maximum number of blog posts included in RSS/Atom feeds. Set to `0`
+    /// to include all posts. Defaults to 20.
+    #[serde(default = "default_feed_limit")]
+    pub feed_limit: usize,
 }
 
 impl std::str::FromStr for Config {

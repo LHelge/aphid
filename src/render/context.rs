@@ -6,6 +6,7 @@ use crate::config::{Config, Social};
 use crate::content::page::{Page, PageKind};
 use crate::content::slug::Slug;
 use crate::content::{PageAny, PageFrontmatter, Site, WikiFrontmatter};
+use crate::generated::FaviconSet;
 use crate::markdown::{HeadingEntry, Rendered};
 
 fn owned(value: Option<&str>) -> Option<String> {
@@ -308,16 +309,30 @@ pub struct SiteContext {
     pub version: String,
     pub nav_pages: Vec<NavEntry>,
     pub socials: Vec<Social>,
+    /// HTML `<link>` tags for favicons. Empty when no favicon is configured.
+    /// Templates should render with `{{ favicon_tags | safe }}`.
+    pub favicon_tags: String,
+    /// Root-relative URL to the Atom feed (`/feed.xml`).
+    pub feed_atom_url: String,
+    /// Root-relative URL to the RSS feed (`/rss.xml`).
+    pub feed_rss_url: String,
 }
 
 impl SiteContext {
-    pub fn from_config(config: &Config, pages: &[Page<PageFrontmatter>]) -> Self {
+    pub fn from_config(
+        config: &Config,
+        pages: &[Page<PageFrontmatter>],
+        favicon: Option<&FaviconSet>,
+    ) -> Self {
         Self {
             site_title: config.title.clone(),
             base_url: config.base_url.clone(),
             version: env!("CARGO_PKG_VERSION").to_string(),
             nav_pages: NavEntry::from_pages(pages),
             socials: config.socials.clone(),
+            favicon_tags: favicon.map(|f| f.html_tags.clone()).unwrap_or_default(),
+            feed_atom_url: "/feed.xml".into(),
+            feed_rss_url: "/rss.xml".into(),
         }
     }
 }

@@ -6,6 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block page_title %}{{ title }}{% endblock page_title %} — {{ site_title }}</title>
     <link rel="stylesheet" href="/static/css/theme.css">
+    {{ favicon_tags | safe }}
+    <link rel="alternate" type="application/atom+xml" title="{{ site_title }} - Atom" href="{{ feed_atom_url }}">
+    <link rel="alternate" type="application/rss+xml" title="{{ site_title }} - RSS" href="{{ feed_rss_url }}">
 </head>
 
 <body>
@@ -26,6 +29,7 @@
 
     <footer class="site-footer">
         <p>Built with <a href="https://github.com/LHelge/aphid">aphid</a></p>
+        <p><a href="{{ feed_atom_url }}">Atom</a> · <a href="{{ feed_rss_url }}">RSS</a></p>
     </footer>
 
     {% if contains_mermaid %}

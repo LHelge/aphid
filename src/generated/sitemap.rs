@@ -1,6 +1,13 @@
+use std::io::Cursor;
+
+use quick_xml::Writer;
+use quick_xml::events::{BytesDecl, BytesText};
+
 use crate::content::Site;
 use crate::content::page::PageKind;
 use crate::content::slug::Slug;
+
+const SITEMAP_NS: &str = "http://www.sitemaps.org/schemas/sitemap/0.9";
 
 /// A generated `sitemap.xml` built from the loaded site content.
 ///
@@ -8,7 +15,7 @@ use crate::content::slug::Slug;
 /// pages include it only when a date is present in their frontmatter.
 /// Standalone pages, index pages, and tag pages omit `<lastmod>`.
 pub struct Sitemap {
-    xml: String,
+    bytes: Vec<u8>,
 }
 
 struct Entry {
@@ -79,39 +86,49 @@ impl Sitemap {
         }
 
         Self {
-            xml: Self::render(&entries),
+            bytes: Self::render(&entries),
         }
     }
 
     /// Consume the value and return the raw XML bytes.
     pub fn into_bytes(self) -> Vec<u8> {
-        self.xml.into_bytes()
+        self.bytes
     }
 
-    fn render(entries: &[Entry]) -> String {
-        let mut xml = String::from(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
-             <urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n",
-        );
-        for entry in entries {
-            xml.push_str("  <url>\n");
-            xml.push_str(&format!("    <loc>{}</loc>\n", escape_xml(&entry.loc)));
-            if let Some(ref date) = entry.lastmod {
-                xml.push_str(&format!("    <lastmod>{date}</lastmod>\n"));
-            }
-            xml.push_str("  </url>\n");
-        }
-        xml.push_str("</urlset>\n");
-        xml
-    }
-}
+    fn render(entries: &[Entry]) -> Vec<u8> {
+        let mut writer = Writer::new_with_indent(Cursor::new(Vec::new()), b' ', 2);
 
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
+        writer
+            .write_event(quick_xml::events::Event::Decl(BytesDecl::new(
+                "1.0",
+                Some("UTF-8"),
+                None,
+            )))
+            .expect("write XML decl");
+
+        writer
+            .create_element("urlset")
+            .with_attribute(("xmlns", SITEMAP_NS))
+            .write_inner_content(|w| {
+                for entry in entries {
+                    w.create_element("url").write_inner_content(|w| {
+                        w.create_element("loc")
+                            .write_text_content(BytesText::new(&entry.loc))?;
+                        if let Some(ref date) = entry.lastmod {
+                            w.create_element("lastmod")
+                                .write_text_content(BytesText::new(date))?;
+                        }
+                        Ok(())
+                    })?;
+                }
+                Ok(())
+            })
+            .expect("write sitemap XML");
+
+        let mut bytes = writer.into_inner().into_inner();
+        bytes.push(b'\n');
+        bytes
+    }
 }
 
 #[cfg(test)]
@@ -172,7 +189,7 @@ mod tests {
             loc: "https://example.com/a&b/".into(),
             lastmod: None,
         }];
-        let xml = Sitemap::render(&entries);
+        let xml = String::from_utf8(Sitemap::render(&entries)).unwrap();
         assert!(xml.contains("https://example.com/a&amp;b/"));
     }
 }

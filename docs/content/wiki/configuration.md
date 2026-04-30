@@ -18,10 +18,12 @@ tags:
 
 | Field | Default | Description |
 |-------|---------|-------------|
+| `description` | | Short site description — used as Atom `<subtitle>` and RSS `<channel><description>` |
 | `source_dir` | `"content"` | Root of the Markdown content tree |
 | `static_dir` | `"static"` | User static files copied to the output's `static/` directory |
 | `theme_dir` | *(embedded)* | Path to a custom theme directory |
 | `wiki_categories` | `[]` | Order for wiki category headings — see [Wiki category order](#wiki-category-order) |
+| `feed_limit` | `20` | Maximum number of blog posts in RSS/Atom feeds. Set to `0` to include all posts |
 
 All path fields are resolved relative to the directory containing `aphid.toml`, so the same paths work regardless of which directory you invoke `aphid` from. For example, `aphid --config docs/aphid.toml build` looks for content in `docs/content/` even when run from the repo root.
 
@@ -74,6 +76,7 @@ url = "https://github.com/example"
 ```toml
 title = "My Site"
 base_url = "https://example.com"
+description = "A blog about interesting things"
 source_dir = "content"
 
 [[authors]]

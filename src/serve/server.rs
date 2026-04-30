@@ -18,7 +18,7 @@ use super::watcher;
 use crate::Error;
 use crate::config::Config;
 use crate::generated::FaviconSet;
-use crate::render::{RenderedSite, Theme};
+use crate::render::{Mode, RenderedSite, Theme};
 
 /// A configured-but-not-yet-bound HTTP server: the rendered site, the axum
 /// router, and the inputs needed to run the file watcher.
@@ -41,7 +41,7 @@ impl Server {
             .map(|p| FaviconSet::generate(p, &config.title))
             .transpose()?;
 
-        let rendered = RenderedSite::build_with_favicon(&config, &theme, false, favicon.clone())?;
+        let rendered = RenderedSite::build_with_favicon(&config, &theme, Mode::Serve, favicon.clone())?;
         let state = Arc::new(AppState::new(rendered, favicon));
         let router = Self::build_router(Arc::clone(&state), &config);
         Ok(Self {

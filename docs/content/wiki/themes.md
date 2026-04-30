@@ -81,6 +81,9 @@ These come from `base.html` and are available in all templates via inheritance:
 | `version` | string | The `aphid` binary version |
 | `nav_pages` | list | Standalone pages sorted by `order`; each has `title` and `url` |
 | `socials` | list | Social links from `aphid.toml`; each has `platform` and `url` |
+| `favicon_tags` | string | HTML `<link>` tags for favicons (empty if no favicon configured). Render with `{{ favicon_tags \| safe }}` |
+| `feed_atom_url` | string | Absolute URL to the Atom feed (`/feed.xml`) |
+| `feed_rss_url` | string | Absolute URL to the RSS feed (`/rss.xml`) |
 
 ## blog_post.html
 

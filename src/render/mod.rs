@@ -13,9 +13,20 @@ use tera::Context;
 use crate::Error;
 use crate::config::Config;
 use crate::content::{PageAny, Site};
-use crate::generated::{FaviconSet, Robots, Sitemap};
-use crate::html::insert_before_closing_tag;
+use crate::generated::{AtomFeed, FaviconSet, Robots, RssFeed, Sitemap};
 use crate::markdown::{MarkdownRenderer, Rendered};
+
+/// Controls mode-specific behaviour during rendering.
+///
+/// In **build** mode broken wiki-links are fatal errors and RSS/Atom feeds
+/// are generated. In **serve** mode broken links are logged as warnings
+/// (so writing can continue) and feed generation is skipped for faster
+/// rebuilds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    Build,
+    Serve,
+}
 
 /// In-memory representation of the rendered site.
 pub struct RenderedSite {
@@ -31,20 +42,16 @@ pub struct RenderedSite {
 impl RenderedSite {
     /// Load content from `config` and render every page against `theme`.
     ///
-    /// If `fail_on_broken_links` is `true`, returns [`Error::BrokenWikiLinks`]
-    /// when any wiki-link target is missing. When `false`, broken links are
-    /// logged as warnings and rendered with a `class="wikilink broken"` span.
-    pub fn build(
-        config: &Config,
-        theme: &Theme,
-        fail_on_broken_links: bool,
-    ) -> Result<Self, Error> {
+    /// In [`Mode::Build`] broken wiki-links are fatal and feeds are
+    /// generated. In [`Mode::Serve`] broken links are warnings and feeds
+    /// are skipped.
+    pub fn build(config: &Config, theme: &Theme, mode: Mode) -> Result<Self, Error> {
         let favicon = config
             .favicon
             .as_ref()
             .map(|p| FaviconSet::generate(p, &config.title))
             .transpose()?;
-        Self::build_with_favicon(config, theme, fail_on_broken_links, favicon)
+        Self::build_with_favicon(config, theme, mode, favicon)
     }
 
     /// Like [`build`](Self::build) but accepts a pre-built [`FaviconSet`].
@@ -55,12 +62,12 @@ impl RenderedSite {
     pub fn build_with_favicon(
         config: &Config,
         theme: &Theme,
-        fail_on_broken_links: bool,
+        mode: Mode,
         favicon: Option<FaviconSet>,
     ) -> Result<Self, Error> {
         tracing::info!(source = %config.source_dir.display(), "loading content");
         let site = Site::load(config.clone())?;
-        Renderer::new(theme).render_all(&site, config, fail_on_broken_links, favicon)
+        Renderer::new(theme).render_all(&site, config, mode, favicon)
     }
 
     /// Look up rendered HTML for a URL path, normalising trailing slashes.
@@ -107,29 +114,27 @@ impl<'a> Renderer<'a> {
         &self,
         site: &Site,
         config: &Config,
-        fail_on_broken_links: bool,
+        mode: Mode,
         favicon: Option<FaviconSet>,
     ) -> Result<RenderedSite, Error> {
         tracing::info!("rendering markdown");
         let rendered = Self::render_markdown(site);
-        Self::check_broken_links(&rendered, site, fail_on_broken_links)?;
+        Self::check_broken_links(&rendered, site, mode)?;
 
-        let site_ctx = SiteContext::from_config(&site.config, &site.pages);
+        let site_ctx = SiteContext::from_config(&site.config, &site.pages, favicon.as_ref());
         let wiki_categories = WikiCategory::from_site(site);
         let mut pages = self.render_content_pages(&rendered, site, &site_ctx, &wiki_categories)?;
         pages.extend(self.render_tag_pages(site, &site_ctx)?);
         pages.extend(self.render_index_pages(site, &rendered, &site_ctx, &wiki_categories)?);
 
-        let mut not_found_html =
+        let not_found_html =
             self.render_template("404.html", &NotFoundContext { site: site_ctx })?;
 
-        // ── Root files (favicon, robots.txt, sitemap.xml) ───────────────
+        // ── Root files (favicon, robots.txt, sitemap.xml, feeds) ────────
         let mut root_files: Vec<(String, Vec<u8>)> = Vec::new();
 
         if let Some(set) = favicon {
             root_files.extend(set.files.clone());
-            inject_into_head(&mut pages, &set.html_tags);
-            inject_into_head_single(&mut not_found_html, &set.html_tags);
         }
 
         root_files.push((
@@ -137,6 +142,14 @@ impl<'a> Renderer<'a> {
             Robots::new(config.normalized_base_url()).into_bytes(),
         ));
         root_files.push(("sitemap.xml".into(), Sitemap::new(site).into_bytes()));
+        root_files.push((
+            "feed.xml".into(),
+            AtomFeed::new(site, &rendered.blog).into_bytes(),
+        ));
+        root_files.push((
+            "rss.xml".into(),
+            RssFeed::new(site, &rendered.blog).into_bytes(),
+        ));
 
         Ok(RenderedSite {
             pages,
@@ -170,7 +183,7 @@ impl<'a> Renderer<'a> {
         pages.par_iter().map(|page| md.render(&page.body)).collect()
     }
 
-    fn check_broken_links(rendered: &RenderedPages, site: &Site, fail: bool) -> Result<(), Error> {
+    fn check_broken_links(rendered: &RenderedPages, site: &Site, mode: Mode) -> Result<(), Error> {
         let all_broken = site
             .iter_pages()
             .zip(rendered.iter_pages())
@@ -188,7 +201,7 @@ impl<'a> Renderer<'a> {
                     .map(|target| ("home.md".to_string(), target)),
             );
 
-        if fail {
+        if mode == Mode::Build {
             let broken: Vec<(String, String)> = all_broken.collect();
             if !broken.is_empty() {
                 return Err(Error::BrokenWikiLinks(broken));
@@ -307,18 +320,6 @@ impl<'a> Renderer<'a> {
     }
 }
 
-/// Inject `tags` before `</head>` in every page's HTML.
-fn inject_into_head(pages: &mut HashMap<String, String>, tags: &str) {
-    for html in pages.values_mut() {
-        inject_into_head_single(html, tags);
-    }
-}
-
-/// Inject `tags` before the first `</head>` in a single HTML string.
-fn inject_into_head_single(html: &mut String, tags: &str) {
-    insert_before_closing_tag(html, "</head>", tags);
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -332,6 +333,9 @@ mod tests {
             version: "0.0.0".into(),
             nav_pages: vec![],
             socials: vec![],
+            favicon_tags: String::new(),
+            feed_atom_url: "http://localhost/feed.xml".into(),
+            feed_rss_url: "http://localhost/rss.xml".into(),
         };
         let ctx = PageContext {
             site: site.clone(),
@@ -393,6 +397,9 @@ mod tests {
                 version: "0.0.0".into(),
                 nav_pages: vec![],
                 socials: vec![],
+                favicon_tags: String::new(),
+                feed_atom_url: "http://localhost/feed.xml".into(),
+                feed_rss_url: "http://localhost/rss.xml".into(),
             },
             title: "My Post".into(),
             url: "/blog/my-post/".into(),

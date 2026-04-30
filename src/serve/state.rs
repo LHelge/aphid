@@ -6,7 +6,7 @@ use tokio::sync::{Notify, RwLock, broadcast};
 use crate::Error;
 use crate::config::Config;
 use crate::generated::FaviconSet;
-use crate::render::{RenderedSite, Theme};
+use crate::render::{Mode, RenderedSite, Theme};
 
 /// Shared state for the axum application.
 #[doc(hidden)]
@@ -43,7 +43,7 @@ impl AppState {
 
         let theme = Theme::load(&config)?;
         let rendered =
-            RenderedSite::build_with_favicon(&config, &theme, false, self.favicon.clone())?;
+            RenderedSite::build_with_favicon(&config, &theme, Mode::Serve, self.favicon.clone())?;
         tracing::info!("rebuild complete in {}ms", start.elapsed().as_millis());
 
         *self.site.write().await = rendered;

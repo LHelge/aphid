@@ -19,6 +19,7 @@ clap = { version = "4.6.1", features = ["derive"] }
 image = "0.25.9"
 notify = "8.2.0"
 pulldown-cmark = "0.13.3"
+quick-xml = "0.39.2"
 rayon = "1.12.0"
 resvg = "0.45.1"
 serde = { version = "1.0.228", features = ["derive"] }

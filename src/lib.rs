@@ -46,14 +46,14 @@ pub use error::Error;
 use std::path::Path;
 
 use config::Config;
-use render::{RenderedSite, Theme};
+use render::{Mode, RenderedSite, Theme};
 
 /// Build the site into the given output directory.
 pub async fn build(config_path: &Path, output_dir: &Path) -> Result<(), Error> {
     let config = Config::from_path(config_path)?;
 
     let theme = Theme::load(&config)?;
-    let rendered = RenderedSite::build(&config, &theme, true)?;
+    let rendered = RenderedSite::build(&config, &theme, Mode::Build)?;
 
     // ── Write output ────────────────────────────────────────────────────────
     tracing::info!(output = %output_dir.display(), "writing output");
