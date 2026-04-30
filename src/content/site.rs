@@ -175,12 +175,25 @@ where
 
 impl Site {
     /// Load all content from disk and build a fully-indexed `Site` in one step.
+    ///
+    /// Pages with `draft: true` in their frontmatter are dropped here, so
+    /// they never enter the slug index, tag index, or backlink graph —
+    /// wiki-links targeting drafts will fail to resolve as if the file
+    /// did not exist on disk.
     pub fn load(config: Config) -> Result<Self, Error> {
         let src = &config.source_dir;
         let mut blog = load_dir(&src.join("blog"), |fm: &BlogFrontmatter, _| fm.slug.clone())?;
-        let wiki = load_dir(&src.join("wiki"), |_, path: &Path| stem(path))?;
-        let pages = load_dir(&src.join("pages"), |_, path: &Path| stem(path))?;
+        let mut wiki = load_dir(&src.join("wiki"), |_: &WikiFrontmatter, path: &Path| {
+            stem(path)
+        })?;
+        let mut pages = load_dir(&src.join("pages"), |_: &PageFrontmatter, path: &Path| {
+            stem(path)
+        })?;
         let home = load_home(&src.join("home.md"))?;
+
+        blog.retain(|p| !p.frontmatter.draft);
+        wiki.retain(|p| !p.frontmatter.draft);
+        pages.retain(|p| !p.frontmatter.draft);
 
         blog.sort();
 
@@ -329,6 +342,7 @@ mod tests {
                 image: None,
                 description: None,
                 tags: vec![],
+                draft: false,
             },
         }
     }
@@ -344,6 +358,7 @@ mod tests {
                 created: None,
                 updated: None,
                 tags: vec![],
+                draft: false,
             },
         }
     }
@@ -356,6 +371,7 @@ mod tests {
             frontmatter: PageFrontmatter {
                 title: "About".into(),
                 order: None,
+                draft: false,
             },
         }
     }
@@ -475,6 +491,62 @@ About page.
         let cfg = minimal_config(dir.path());
         let site = Site::load(cfg).unwrap();
         assert!(site.home.is_none());
+    }
+
+    #[test]
+    fn drafts_are_excluded_from_load() {
+        let dir = TempDir::new().unwrap();
+        let src = dir.path();
+
+        write_file(
+            &src.join("blog/published.md"),
+            "\
+---
+title: Published
+slug: published
+author: A
+created: 2024-01-01
+---
+",
+        );
+        write_file(
+            &src.join("blog/wip.md"),
+            "\
+---
+title: WIP
+slug: wip
+author: A
+created: 2024-02-01
+draft: true
+---
+",
+        );
+        write_file(
+            &src.join("wiki/draft-page.md"),
+            "\
+---
+draft: true
+---
+",
+        );
+        write_file(
+            &src.join("pages/secret.md"),
+            "\
+---
+title: Secret
+draft: true
+---
+",
+        );
+
+        let site = Site::load(minimal_config(src)).unwrap();
+
+        assert_eq!(site.blog.len(), 1);
+        assert_eq!(site.blog[0].slug.to_string(), "published");
+        assert!(site.wiki.is_empty());
+        assert!(site.pages.is_empty());
+        assert!(!site.slug_index.contains_key(&Slug::from("wip")));
+        assert!(!site.slug_index.contains_key(&Slug::from("secret")));
     }
 
     #[test]

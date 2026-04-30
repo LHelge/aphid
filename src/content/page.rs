@@ -212,6 +212,7 @@ mod tests {
                 image: None,
                 description: None,
                 tags: vec![],
+                draft: false,
             },
         }
     }
@@ -227,6 +228,7 @@ mod tests {
                 created: None,
                 updated: None,
                 tags: vec![],
+                draft: false,
             },
         }
     }
@@ -239,6 +241,7 @@ mod tests {
             frontmatter: PageFrontmatter {
                 title: "About".into(),
                 order: None,
+                draft: false,
             },
         }
     }

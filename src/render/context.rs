@@ -513,6 +513,7 @@ mod tests {
                 created: None,
                 updated: None,
                 tags: vec![],
+                draft: false,
             },
         }
     }
@@ -596,6 +597,7 @@ mod tests {
                 image: None,
                 description: None,
                 tags: vec![],
+                draft: false,
             },
         }
     }

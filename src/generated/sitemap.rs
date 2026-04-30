@@ -174,6 +174,7 @@ mod tests {
                 image: None,
                 description: None,
                 tags: vec![],
+                draft: false,
             },
         }];
         let site = Site::from_parts(config, blog, vec![], vec![]).unwrap();

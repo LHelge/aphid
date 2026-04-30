@@ -28,6 +28,7 @@ fn blog_page(slug: &str, title: &str, body: &str) -> Page<BlogFrontmatter> {
             image: None,
             description: None,
             tags: vec![],
+            draft: false,
         },
     }
 }
@@ -43,6 +44,7 @@ fn wiki_page(slug: &str, body: &str) -> Page<WikiFrontmatter> {
             created: None,
             updated: None,
             tags: vec![],
+            draft: false,
         },
     }
 }

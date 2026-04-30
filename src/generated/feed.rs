@@ -309,6 +309,7 @@ mod tests {
                 image: None,
                 description: Some(format!("About {title}")),
                 tags: tags.into_iter().map(Into::into).collect(),
+                draft: false,
             },
         }
     }

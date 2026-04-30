@@ -495,6 +495,7 @@ mod tests {
                 image: None,
                 description: None,
                 tags: vec!["rust".into()],
+                draft: false,
             },
         }
     }
@@ -628,6 +629,7 @@ mod tests {
                 frontmatter: PageFrontmatter {
                     title: "Contact".into(),
                     order: Some(2),
+                    draft: false,
                 },
             },
             Page {
@@ -637,6 +639,7 @@ mod tests {
                 frontmatter: PageFrontmatter {
                     title: "About".into(),
                     order: Some(1),
+                    draft: false,
                 },
             },
             Page {
@@ -646,6 +649,7 @@ mod tests {
                 frontmatter: PageFrontmatter {
                     title: "FAQ".into(),
                     order: None,
+                    draft: false,
                 },
             },
         ];

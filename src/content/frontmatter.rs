@@ -20,6 +20,11 @@ pub struct BlogFrontmatter {
     pub description: Option<String>,
     #[serde(default)]
     pub tags: Vec<String>,
+    /// When `true`, the post is excluded from the build entirely:
+    /// no rendered page, no listings, no feeds, not addressable by
+    /// `[[wiki-link]]`. Defaults to `false`.
+    #[serde(default)]
+    pub draft: bool,
 }
 
 /// Frontmatter for a wiki page. Title is optional — when omitted, the
@@ -34,6 +39,9 @@ pub struct WikiFrontmatter {
     pub updated: Option<NaiveDate>,
     #[serde(default)]
     pub tags: Vec<String>,
+    /// When `true`, the page is excluded from the build entirely.
+    #[serde(default)]
+    pub draft: bool,
 }
 
 /// Frontmatter for a standalone page (About, Contact, etc.). `order`
@@ -43,6 +51,10 @@ pub struct WikiFrontmatter {
 pub struct PageFrontmatter {
     pub title: String,
     pub order: Option<i32>,
+    /// When `true`, the page is excluded from the build entirely
+    /// (also removes it from the site nav).
+    #[serde(default)]
+    pub draft: bool,
 }
 
 /// Extract YAML frontmatter and markdown body from a source string.
@@ -130,6 +142,39 @@ Body.
 ";
         let (fm, _): (BlogFrontmatter, String) = parse(input).unwrap();
         assert_eq!(fm.tags, ["rust", "cli"]);
+    }
+
+    #[test]
+    fn draft_defaults_to_false() {
+        let input = "\
+---
+title: T
+slug: t
+author: A
+created: 2024-01-01
+---
+
+Body.
+";
+        let (fm, _): (BlogFrontmatter, String) = parse(input).unwrap();
+        assert!(!fm.draft);
+    }
+
+    #[test]
+    fn draft_true_parses() {
+        let input = "\
+---
+title: T
+slug: t
+author: A
+created: 2024-01-01
+draft: true
+---
+
+Body.
+";
+        let (fm, _): (BlogFrontmatter, String) = parse(input).unwrap();
+        assert!(fm.draft);
     }
 
     #[test]

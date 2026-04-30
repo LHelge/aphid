@@ -19,6 +19,7 @@ Every content file begins with a YAML frontmatter block delimited by `---`. The 
 | `image` | no | Path or URL to a hero image, rendered above the post body and shown in blog listings |
 | `description` | no | Short summary shown in blog listings (home page, blog index) |
 | `tags` | no | List of tag strings |
+| `draft` | no | When `true`, the post is excluded from the build entirely — see [Drafts](#drafts) |
 
 ```yaml
 ---
@@ -45,6 +46,7 @@ All fields are optional. The page title falls back to the filename stem if `titl
 | `created` | no | Creation date |
 | `updated` | no | Last-edited date |
 | `tags` | no | List of tag strings |
+| `draft` | no | When `true`, the page is excluded from the build entirely — see [Drafts](#drafts) |
 
 ```yaml
 ---
@@ -65,6 +67,7 @@ Wiki pages live at `/wiki/<stem>/` regardless of category — the category is pu
 |-------|----------|-------------|
 | `title` | yes | Page title, shown in nav |
 | `order` | no | Sort position in the nav (lower = earlier) |
+| `draft` | no | When `true`, the page is excluded from the build entirely (and dropped from the nav) — see [Drafts](#drafts) |
 
 ```yaml
 ---
@@ -74,5 +77,25 @@ order: 1
 ```
 
 Standalone pages live at `/<stem>/`.
+
+# Drafts
+
+Setting `draft: true` on any content file excludes it from the build:
+
+- No HTML page is rendered for it.
+- It does not appear in the blog index, tag pages, RSS/Atom feeds, sitemap, or — for standalone pages — the site nav.
+- It is not addressable via `[[wiki-link]]`. Wiki-links pointing at a draft fail to resolve as if the file did not exist on disk: `aphid build` reports a broken link error; `aphid serve` warns and renders a placeholder.
+
+```yaml
+---
+title: Half-finished thoughts
+slug: wip
+author: Alice
+created: 2026-05-01
+draft: true
+---
+```
+
+Drafts apply in both `serve` and `build` modes — there is no preview override. To publish a draft, change `draft: true` to `false` (or remove the field).
 
 See also: [[configuration]], [[wiki-links]].
