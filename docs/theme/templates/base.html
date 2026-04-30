@@ -81,6 +81,39 @@
     });
   </script>
 
+  <script>
+    // Scroll-spy: highlight the TOC entry for the currently visible section
+    (() => {
+      const links = document.querySelectorAll('.toc-entry');
+      if (!links.length) return;
+      const headings = [];
+      links.forEach(a => {
+        const el = document.getElementById(a.getAttribute('href').slice(1));
+        if (el) headings.push(el);
+      });
+      if (!headings.length) return;
+
+      function activate(id) {
+        links.forEach(a => a.classList.toggle('active',
+          a.getAttribute('href') === '#' + id));
+      }
+
+      // Pick the last heading that has scrolled past the trigger line
+      function update() {
+        const trigger = window.scrollY + 90;
+        let current = headings[0].id;
+        for (const h of headings) {
+          if (h.offsetTop <= trigger) current = h.id;
+          else break;
+        }
+        activate(current);
+      }
+
+      window.addEventListener('scroll', update, { passive: true });
+      update();  // highlight on initial load
+    })();
+  </script>
+
   {% if contains_mermaid %}
   <script src="/static/js/mermaid.min.js"></script>
   <script>

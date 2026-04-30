@@ -608,7 +608,8 @@ a:hover {
   text-decoration: none;
 }
 
-.toc-entry:hover {
+.toc-entry:hover,
+.toc-entry.active {
   color: var(--accent);
   border-left-color: var(--accent);
 }
