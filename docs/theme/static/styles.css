@@ -83,6 +83,11 @@ a:hover {
 }
 
 /* ── Prose ──────────────────────────────────────────────────────────────── */
+.prose {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
 .prose h1,
 .prose h2,
 .prose h3,
@@ -253,7 +258,7 @@ a:hover {
   color: var(--text);
 }
 
-.prose .markdown-alert > :last-child {
+.prose .markdown-alert> :last-child {
   margin-bottom: 0;
 }
 
@@ -1114,6 +1119,10 @@ a:hover {
   gap: 48px;
 }
 
+.post-grid>article {
+  min-width: 0;
+}
+
 .post-header {
   margin-bottom: 32px;
 }
@@ -1482,5 +1491,12 @@ a:hover {
 
   .feature-strip-inner {
     flex-direction: column;
+    gap: 12px;
+    padding: 16px 24px;
+  }
+
+  .feature-item {
+    flex: none;
+    max-width: none;
   }
 }
