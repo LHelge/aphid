@@ -21,5 +21,14 @@ async fn main() -> Result<(), Error> {
         Command::Init { path } => {
             aphid::scaffold_init(&path.unwrap_or_else(|| std::path::PathBuf::from(".")))
         }
+        Command::Blog { action } => match action {
+            cli::BlogAction::New { title } => aphid::new_blog_post(&cli.config, &title),
+        },
+        Command::Wiki { action } => match action {
+            cli::WikiAction::New { title } => aphid::new_wiki_page(&cli.config, &title),
+        },
+        Command::Page { action } => match action {
+            cli::PageAction::New { title } => aphid::new_page(&cli.config, &title),
+        },
     }
 }
