@@ -15,7 +15,7 @@
     <nav class="site-nav">
         <a href="/" class="nav-brand">{{ site_title }}</a>
         <ul>
-            <li><a href="/">Blog</a></li>
+            <li><a href="/blog/">Blog</a></li>
             <li><a href="/wiki/">Wiki</a></li>
             {% for p in nav_pages %}
             <li><a href="{{ p.url | safe }}">{{ p.title }}</a></li>
@@ -30,6 +30,13 @@
     <footer class="site-footer">
         <p>Built with <a href="https://github.com/LHelge/aphid">aphid</a></p>
         <p><a href="{{ feed_atom_url }}">Atom</a> · <a href="{{ feed_rss_url }}">RSS</a></p>
+        {% if socials | length > 0 %}
+        <ul class="socials">
+            {% for s in socials %}
+            <li><a href="{{ s.url }}">{{ s.platform }}</a></li>
+            {% endfor %}
+        </ul>
+        {% endif %}
     </footer>
 
     {% if contains_mermaid %}

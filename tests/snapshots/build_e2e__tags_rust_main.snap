@@ -1,6 +1,6 @@
 ---
 source: tests/build_e2e.rs
-assertion_line: 56
+assertion_line: 55
 expression: extract_main(&html)
 ---
 <main class="content">
@@ -8,14 +8,36 @@ expression: extract_main(&html)
 <h1>Posts tagged #rust</h1>
 <ul class="blog-list">
     
-    <li>
+    <li class="post-card">
+        
         <a href="/blog/second-post/">Second Post</a>
         <time>2024-06-01</time>
+        
+        
+        <ul class="tag-list">
+            
+            <li><a href="/tags/rust/">rust</a></li>
+            
+            <li><a href="/tags/advanced/">advanced</a></li>
+            
+        </ul>
+        
     </li>
     
-    <li>
+    <li class="post-card">
+        
         <a href="/blog/first-post/">First Post</a>
         <time>2024-01-01</time>
+        
+        
+        <ul class="tag-list">
+            
+            <li><a href="/tags/rust/">rust</a></li>
+            
+            <li><a href="/tags/tutorial/">tutorial</a></li>
+            
+        </ul>
+        
     </li>
     
 </ul>
