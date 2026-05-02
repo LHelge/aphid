@@ -17,5 +17,9 @@ async fn main() -> Result<(), Error> {
     match cli.command.unwrap_or(Command::Serve { port: 3000 }) {
         Command::Build { output } => aphid::build(&cli.config, &output).await,
         Command::Serve { port } => aphid::serve(&cli.config, port).await,
+        Command::New { name } => aphid::scaffold_new(&name),
+        Command::Init { path } => {
+            aphid::scaffold_init(&path.unwrap_or_else(|| std::path::PathBuf::from(".")))
+        }
     }
 }

@@ -37,6 +37,7 @@ mod html;
 pub mod markdown;
 pub mod output;
 pub mod render;
+pub mod scaffold;
 pub mod serve;
 #[doc(hidden)]
 pub mod testutil;
@@ -67,4 +68,14 @@ pub async fn build(config_path: &Path, output_dir: &Path) -> Result<(), Error> {
 /// Serve the site with file watching and live reload.
 pub async fn serve(config_path: &Path, port: u16) -> Result<(), Error> {
     serve::Server::new(config_path)?.run(port).await
+}
+
+/// Create a new site in a new directory named `name`.
+pub fn scaffold_new(name: &str) -> Result<(), Error> {
+    scaffold::new(name)
+}
+
+/// Initialize a site in an existing directory at `path`.
+pub fn scaffold_init(path: &Path) -> Result<(), Error> {
+    scaffold::init(path)
 }

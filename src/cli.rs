@@ -22,4 +22,14 @@ pub enum Command {
         #[arg(short, long, default_value_t = 3000)]
         port: u16,
     },
+    /// Create a new aphid site in a new directory.
+    New {
+        /// Name of the directory to create.
+        name: String,
+    },
+    /// Initialize an aphid site in the current directory.
+    Init {
+        /// Directory to initialize (defaults to current directory).
+        path: Option<PathBuf>,
+    },
 }
