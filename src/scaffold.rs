@@ -5,6 +5,7 @@ use chrono::Local;
 
 use crate::Error;
 use crate::config::Config;
+use crate::content::slug::Slug;
 use crate::output::OutputWriter;
 use crate::render::{Mode, RenderedSite, Theme};
 
@@ -68,6 +69,96 @@ pub fn init(path: &Path) -> Result<(), Error> {
     Ok(())
 }
 
+pub fn new_blog_post(config_path: &Path, title: &str) -> Result<(), Error> {
+    let config = Config::from_path(config_path)?;
+    let path = write_blog_post(&config.source_dir, title)?;
+    println!("  Created {}", path.display());
+    Ok(())
+}
+
+pub fn new_wiki_page(config_path: &Path, title: &str) -> Result<(), Error> {
+    let config = Config::from_path(config_path)?;
+    let path = write_wiki_page(&config.source_dir, title)?;
+    println!("  Created {}", path.display());
+    Ok(())
+}
+
+pub fn new_page(config_path: &Path, title: &str) -> Result<(), Error> {
+    let config = Config::from_path(config_path)?;
+    let path = write_page(&config.source_dir, title)?;
+    println!("  Created {}", path.display());
+    Ok(())
+}
+
+fn write_blog_post(content_dir: &Path, title: &str) -> Result<PathBuf, Error> {
+    let date = Local::now().format("%Y-%m-%d");
+    let slug = Slug::from(title);
+    let filename = format!("{date}_{slug}.md");
+    let content = format!(
+        "\
+---
+title: {title}
+slug: {slug}
+author: Your Name
+created: {date}
+description: \"\"
+tags: []
+---
+
+",
+    );
+    let path = content_dir.join("blog").join(&filename);
+    if path.exists() {
+        return Err(Error::Scaffold {
+            message: format!("file '{}' already exists", path.display()),
+        });
+    }
+    write_file(&path, &content)?;
+    Ok(path)
+}
+
+fn write_wiki_page(content_dir: &Path, title: &str) -> Result<PathBuf, Error> {
+    let slug = Slug::from(title);
+    let filename = format!("{slug}.md");
+    let content = format!(
+        "\
+---
+title: {title}
+---
+
+",
+    );
+    let path = content_dir.join("wiki").join(&filename);
+    if path.exists() {
+        return Err(Error::Scaffold {
+            message: format!("file '{}' already exists", path.display()),
+        });
+    }
+    write_file(&path, &content)?;
+    Ok(path)
+}
+
+fn write_page(content_dir: &Path, title: &str) -> Result<PathBuf, Error> {
+    let slug = Slug::from(title);
+    let filename = format!("{slug}.md");
+    let content = format!(
+        "\
+---
+title: {title}
+---
+
+",
+    );
+    let path = content_dir.join("pages").join(&filename);
+    if path.exists() {
+        return Err(Error::Scaffold {
+            message: format!("file '{}' already exists", path.display()),
+        });
+    }
+    write_file(&path, &content)?;
+    Ok(path)
+}
+
 fn title_from_name(name: &str) -> String {
     name.split(['-', '_'])
         .filter(|s| !s.is_empty())
@@ -94,9 +185,9 @@ impl Scaffold {
     fn write_all(&self) -> Result<(), Error> {
         self.write_config()?;
         self.write_gitignore()?;
-        self.write_blog_post()?;
-        self.write_wiki_page()?;
-        self.write_about_page()?;
+        self.write_initial_blog_post()?;
+        self.write_initial_wiki_page()?;
+        self.write_initial_page()?;
         self.write_home()?;
         self.create_static_dir()?;
         Ok(())
@@ -114,33 +205,15 @@ impl Scaffold {
         write_file(&self.dir.join(".gitignore"), "/dist\n")
     }
 
-    fn write_blog_post(&self) -> Result<(), Error> {
-        let date = Local::now().format("%Y-%m-%d");
-        let filename = format!("{date}_hello-world.md");
-        let content = format!(
-            "\
----
-title: Hello World
-slug: hello-world
-author: Your Name
-created: {date}
-description: My first blog post.
-tags:
-  - hello
----
-
-# Welcome
-
-This is your first blog post. Edit this file or create new `.md` files in the
-`content/blog/` directory to add more posts.
-
-See the [[getting-started]] wiki page for more information.
-"
-        );
-        write_file(&self.dir.join("content/blog").join(filename), &content)
+    fn write_initial_blog_post(&self) -> Result<(), Error> {
+        let content_dir = self.dir.join("content");
+        write_blog_post(&content_dir, "Hello World")?;
+        Ok(())
     }
 
-    fn write_wiki_page(&self) -> Result<(), Error> {
+    fn write_initial_wiki_page(&self) -> Result<(), Error> {
+        let content_dir = self.dir.join("content");
+        let slug = Slug::from("Getting Started");
         let content = "\
 ---
 title: Getting Started
@@ -161,10 +234,13 @@ linked from anywhere as `[[getting-started]]`.
 Run `aphid serve` to start the development server, or `aphid build` to render
 the site into the `dist/` directory.
 ";
-        write_file(&self.dir.join("content/wiki/getting-started.md"), content)
+        write_file(
+            &content_dir.join("wiki").join(format!("{slug}.md")),
+            content,
+        )
     }
 
-    fn write_about_page(&self) -> Result<(), Error> {
+    fn write_initial_page(&self) -> Result<(), Error> {
         let content = format!(
             "\
 ---
@@ -294,5 +370,93 @@ mod tests {
         init(&nested).unwrap();
 
         assert!(nested.join("aphid.toml").exists());
+    }
+
+    fn scaffold_site(tmp: &Path) -> PathBuf {
+        let site_dir = tmp.join("site");
+        new(site_dir.to_str().unwrap()).unwrap();
+        site_dir
+    }
+
+    #[test]
+    fn new_blog_post_creates_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let site_dir = scaffold_site(tmp.path());
+        let config_path = site_dir.join("aphid.toml");
+
+        new_blog_post(&config_path, "My New Post").unwrap();
+
+        let date = Local::now().format("%Y-%m-%d");
+        let expected = site_dir
+            .join("content/blog")
+            .join(format!("{date}_my-new-post.md"));
+        assert!(expected.exists());
+
+        let content = fs::read_to_string(&expected).unwrap();
+        assert!(content.contains("title: My New Post"));
+        assert!(content.contains("slug: my-new-post"));
+    }
+
+    #[test]
+    fn new_blog_post_fails_if_file_exists() {
+        let tmp = tempfile::tempdir().unwrap();
+        let site_dir = scaffold_site(tmp.path());
+        let config_path = site_dir.join("aphid.toml");
+
+        new_blog_post(&config_path, "My New Post").unwrap();
+        let err = new_blog_post(&config_path, "My New Post").unwrap_err();
+        assert!(err.to_string().contains("already exists"));
+    }
+
+    #[test]
+    fn new_wiki_page_creates_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let site_dir = scaffold_site(tmp.path());
+        let config_path = site_dir.join("aphid.toml");
+
+        new_wiki_page(&config_path, "My Topic").unwrap();
+
+        let expected = site_dir.join("content/wiki/my-topic.md");
+        assert!(expected.exists());
+
+        let content = fs::read_to_string(&expected).unwrap();
+        assert!(content.contains("title: My Topic"));
+    }
+
+    #[test]
+    fn new_wiki_page_fails_if_file_exists() {
+        let tmp = tempfile::tempdir().unwrap();
+        let site_dir = scaffold_site(tmp.path());
+        let config_path = site_dir.join("aphid.toml");
+
+        new_wiki_page(&config_path, "My Topic").unwrap();
+        let err = new_wiki_page(&config_path, "My Topic").unwrap_err();
+        assert!(err.to_string().contains("already exists"));
+    }
+
+    #[test]
+    fn new_page_creates_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let site_dir = scaffold_site(tmp.path());
+        let config_path = site_dir.join("aphid.toml");
+
+        new_page(&config_path, "Contact").unwrap();
+
+        let expected = site_dir.join("content/pages/contact.md");
+        assert!(expected.exists());
+
+        let content = fs::read_to_string(&expected).unwrap();
+        assert!(content.contains("title: Contact"));
+    }
+
+    #[test]
+    fn new_page_fails_if_file_exists() {
+        let tmp = tempfile::tempdir().unwrap();
+        let site_dir = scaffold_site(tmp.path());
+        let config_path = site_dir.join("aphid.toml");
+
+        new_page(&config_path, "Contact").unwrap();
+        let err = new_page(&config_path, "Contact").unwrap_err();
+        assert!(err.to_string().contains("already exists"));
     }
 }

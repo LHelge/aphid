@@ -32,4 +32,46 @@ pub enum Command {
         /// Directory to initialize (defaults to current directory).
         path: Option<PathBuf>,
     },
+    /// Manage blog posts.
+    Blog {
+        #[command(subcommand)]
+        action: BlogAction,
+    },
+    /// Manage wiki pages.
+    Wiki {
+        #[command(subcommand)]
+        action: WikiAction,
+    },
+    /// Manage standalone pages.
+    Page {
+        #[command(subcommand)]
+        action: PageAction,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum BlogAction {
+    /// Create a new blog post.
+    New {
+        /// Title of the blog post.
+        title: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum WikiAction {
+    /// Create a new wiki page.
+    New {
+        /// Title of the wiki page.
+        title: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum PageAction {
+    /// Create a new standalone page.
+    New {
+        /// Title of the page.
+        title: String,
+    },
 }

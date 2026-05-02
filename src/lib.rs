@@ -79,3 +79,18 @@ pub fn scaffold_new(name: &str) -> Result<(), Error> {
 pub fn scaffold_init(path: &Path) -> Result<(), Error> {
     scaffold::init(path)
 }
+
+/// Create a new blog post in the site at `config_path`.
+pub fn new_blog_post(config_path: &Path, title: &str) -> Result<(), Error> {
+    scaffold::new_blog_post(config_path, title)
+}
+
+/// Create a new wiki page in the site at `config_path`.
+pub fn new_wiki_page(config_path: &Path, title: &str) -> Result<(), Error> {
+    scaffold::new_wiki_page(config_path, title)
+}
+
+/// Create a new standalone page in the site at `config_path`.
+pub fn new_page(config_path: &Path, title: &str) -> Result<(), Error> {
+    scaffold::new_page(config_path, title)
+}

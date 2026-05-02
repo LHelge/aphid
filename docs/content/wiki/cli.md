@@ -5,7 +5,7 @@ tags:
   - reference
 ---
 
-The `aphid` binary has two subcommands and a small set of flags. Running `aphid` with no subcommand starts the dev server on port 3000 — the most common case while writing content.
+The `aphid` binary has several subcommands and a small set of flags. Running `aphid` with no subcommand starts the dev server on port 3000 — the most common case while writing content.
 
 # Synopsis
 
@@ -57,6 +57,36 @@ Run a development server with file watching and WebSocket-driven live reload. Ba
 |------|---------|-------------|
 | `--port`, `-p` | `3000` | TCP port to bind |
 
+## `aphid blog new`
+
+Create a new blog post in the current site. The title is used to derive the slug and filename. Today's date is used for both the filename prefix and the `created` frontmatter field.
+
+```
+aphid blog new <title>
+```
+
+Example: `aphid blog new "My First Post"` creates `content/blog/2026-05-02_my-first-post.md`.
+
+## `aphid wiki new`
+
+Create a new wiki page in the current site.
+
+```
+aphid wiki new <title>
+```
+
+Example: `aphid wiki new "Architecture Overview"` creates `content/wiki/architecture-overview.md`.
+
+## `aphid page new`
+
+Create a new standalone page in the current site.
+
+```
+aphid page new <title>
+```
+
+Example: `aphid page new "Contact"` creates `content/pages/contact.md`.
+
 # Global flags
 
 | Flag | Default | Description |
@@ -71,6 +101,9 @@ Run a development server with file watching and WebSocket-driven live reload. Ba
 aphid new my-blog                        # scaffold a new site in my-blog/
 aphid init                               # scaffold in the current directory
 aphid init path/to/site                  # scaffold in a specific directory
+aphid blog new "My First Post"           # create a new blog post
+aphid wiki new "Architecture Overview"   # create a new wiki page
+aphid page new "Contact"                 # create a new standalone page
 aphid                                    # serve on :3000
 aphid serve --port 8080                  # serve on :8080
 aphid build                              # one-shot render into dist/
