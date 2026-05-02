@@ -274,8 +274,9 @@ default home page layout.
     }
 
     fn build_site(&self) -> Result<(), Error> {
-        let config_path = self.dir.join("aphid.toml");
-        let output_dir = self.dir.join("dist");
+        let dir = self.dir.canonicalize()?;
+        let config_path = dir.join("aphid.toml");
+        let output_dir = dir.join("dist");
         let config = Config::from_path(&config_path)?;
         let theme = Theme::load(&config)?;
         let rendered = RenderedSite::build(&config, &theme, Mode::Build)?;
