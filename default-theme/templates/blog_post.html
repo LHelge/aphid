@@ -6,8 +6,10 @@
         <h1>{{ title }}</h1>
         <div class="post-meta">
             {% if created %}<time>{{ created }}</time>{% endif %}
+            {% if updated %}<time>(updated {{ updated }})</time>{% endif %}
             {% if author %}<span class="author">by {{ author }}</span>{% endif %}
         </div>
+        {% if description %}<p class="post-description">{{ description }}</p>{% endif %}
         {% if tags | length > 0 %}
         <ul class="tag-list">
             {% for tag in tags %}
@@ -37,6 +39,17 @@
             {{ content | safe }}
         </div>
     </div>
+
+    {% if backlinks | length > 0 %}
+    <section class="backlinks">
+        <h2>Pages that link here</h2>
+        <ul>
+            {% for link in backlinks %}
+            <li><a href="{{ link.url | safe }}">{{ link.title }}</a></li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
 
     {% if newer_post or older_post %}
     <nav class="post-nav" aria-label="Adjacent posts">
