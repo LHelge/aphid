@@ -32,6 +32,21 @@ const DEFAULT_TAG: &str = include_str!("../../default-theme/templates/tag.html")
 const DEFAULT_TAGS_INDEX: &str = include_str!("../../default-theme/templates/tags_index.html");
 const DEFAULT_PAGINATION: &str = include_str!("../../default-theme/templates/pagination.html");
 const DEFAULT_404: &str = include_str!("../../default-theme/templates/404.html");
+const DEFAULT_THEME_TOML: &str = include_str!("../../default-theme/theme.toml");
+
+pub const DEFAULT_TEMPLATES: &[(&str, &str)] = &[
+    ("base.html", DEFAULT_BASE),
+    ("home.html", DEFAULT_HOME),
+    ("blog_post.html", DEFAULT_BLOG_POST),
+    ("blog_index.html", DEFAULT_BLOG_INDEX),
+    ("wiki_page.html", DEFAULT_WIKI_PAGE),
+    ("wiki_index.html", DEFAULT_WIKI_INDEX),
+    ("page.html", DEFAULT_PAGE),
+    ("tag.html", DEFAULT_TAG),
+    ("tags_index.html", DEFAULT_TAGS_INDEX),
+    ("pagination.html", DEFAULT_PAGINATION),
+    ("404.html", DEFAULT_404),
+];
 
 // Embedded default theme static files (relative path → content).
 // `mermaid.min.js` is the upstream UMD bundle for client-side diagram
@@ -176,6 +191,26 @@ impl Theme {
         }
         for (rel_path, content) in &self.embedded_static {
             let file_path = dest.join(rel_path);
+            if let Some(parent) = file_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(&file_path, content)?;
+        }
+        Ok(())
+    }
+
+    /// Write the embedded default theme to `dir/` so users have a starting
+    /// point for customisation.
+    pub fn write_default_to_dir(dir: &Path) -> Result<(), Error> {
+        let templates_dir = dir.join("templates");
+        fs::create_dir_all(&templates_dir)?;
+        for (name, content) in DEFAULT_TEMPLATES {
+            fs::write(templates_dir.join(name), content)?;
+        }
+        fs::write(dir.join("theme.toml"), DEFAULT_THEME_TOML)?;
+        let static_dir = dir.join("static");
+        for (rel_path, content) in DEFAULT_STATIC_FILES {
+            let file_path = static_dir.join(rel_path);
             if let Some(parent) = file_path.parent() {
                 fs::create_dir_all(parent)?;
             }
