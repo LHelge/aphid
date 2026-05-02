@@ -185,6 +185,7 @@ impl Scaffold {
     fn write_all(&self) -> Result<(), Error> {
         self.write_config()?;
         self.write_gitignore()?;
+        self.write_theme()?;
         self.write_initial_blog_post()?;
         self.write_initial_wiki_page()?;
         self.write_initial_page()?;
@@ -195,10 +196,14 @@ impl Scaffold {
 
     fn write_config(&self) -> Result<(), Error> {
         let content = format!(
-            "title = \"{}\"\nbase_url = \"https://example.com\"\n",
+            "title = \"{}\"\nbase_url = \"https://example.com\"\ntheme_dir = \"theme\"\n",
             self.title
         );
         write_file(&self.dir.join("aphid.toml"), &content)
+    }
+
+    fn write_theme(&self) -> Result<(), Error> {
+        Theme::write_default_to_dir(&self.dir.join("theme"))
     }
 
     fn write_gitignore(&self) -> Result<(), Error> {
