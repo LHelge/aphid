@@ -40,6 +40,8 @@ pub enum Error {
     Notify(#[from] notify::Error),
     #[error("refusing unsafe path '{}': {reason}", path.display())]
     UnsafeOutputPath { path: PathBuf, reason: &'static str },
+    #[error("scaffold error: {message}")]
+    Scaffold { message: String },
     #[error("failed to generate favicon from '{}': {reason}", path.display())]
     Favicon { path: PathBuf, reason: String },
 }

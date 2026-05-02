@@ -15,6 +15,30 @@ aphid [--config <path>] [<command>] [command flags]
 
 # Commands
 
+## `aphid new`
+
+Create a new aphid site in a new directory. Generates a minimal but complete site structure: config file, example blog post, wiki page, about page, home page, static directory, and `.gitignore`.
+
+```
+aphid new <name>
+```
+
+The directory name is converted into the site title (`my-cool-blog` becomes "My Cool Blog"). Fails if the directory already exists.
+
+## `aphid init`
+
+Initialize an aphid site in an existing directory (or the current directory). Creates the same files as `aphid new`, but does not create a new parent directory.
+
+```
+aphid init [path]
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `path` | `.` | Directory to initialize |
+
+Fails if the target directory already contains an `aphid.toml`.
+
 ## `aphid build`
 
 Render every page into the output directory (default `./dist/`) and copy theme + user static files alongside. The output directory is wiped and recreated on every build, so it must not point at a directory containing files you want to keep. Broken `[[wiki-links]]` cause the build to fail and report every offending page.
@@ -44,6 +68,9 @@ Run a development server with file watching and WebSocket-driven live reload. Ba
 # Examples
 
 ```sh
+aphid new my-blog                        # scaffold a new site in my-blog/
+aphid init                               # scaffold in the current directory
+aphid init path/to/site                  # scaffold in a specific directory
 aphid                                    # serve on :3000
 aphid serve --port 8080                  # serve on :8080
 aphid build                              # one-shot render into dist/
