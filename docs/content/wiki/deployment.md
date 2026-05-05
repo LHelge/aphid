@@ -17,7 +17,65 @@ In the repository settings, set the Pages source to **GitHub Actions**.
 
 ## 2. Add the workflow
 
-Create `.github/workflows/pages.yml`:
+The recommended approach uses the official `LHelge/aphid` action, which downloads a pre-built binary — no Rust toolchain needed:
+
+```yaml
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: LHelge/aphid@main
+        with:
+          output: _site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - uses: actions/deploy-pages@v4
+        id: deployment
+```
+
+The action accepts these inputs:
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `version` | `latest` | aphid version to download (e.g. `v0.1.4`) |
+| `config` | `aphid.toml` | Path to the config file |
+| `output` | `dist` | Output directory for the built site |
+
+If your `aphid.toml` is not at the repository root, pass the path explicitly:
+
+```yaml
+- uses: LHelge/aphid@main
+  with:
+    config: path/to/aphid.toml
+    output: _site
+```
+
+## Alternative: install from crates.io
+
+If you prefer to build from source (longer CI times but no dependency on GitHub releases):
 
 ```yaml
 name: Deploy to GitHub Pages
@@ -57,13 +115,6 @@ jobs:
 
       - uses: actions/deploy-pages@v4
         id: deployment
-```
-
-If your `aphid.toml` is not at the repository root, pass the path explicitly:
-
-```yaml
-- name: Build site
-  run: cargo install aphid --locked && aphid --config path/to/aphid.toml build
 ```
 
 ## Building from source in CI
