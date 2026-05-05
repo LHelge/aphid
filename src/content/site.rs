@@ -25,9 +25,16 @@ fn load_home(path: &Path) -> Result<Option<HomePage>, Error> {
     if !path.is_file() {
         return Ok(None);
     }
-    let body = fs::read_to_string(path).map_err(|e| Error::LoadPage {
-        path: path.to_path_buf(),
-        source: Box::new(Error::Io(e)),
+    let body = fs::read_to_string(path).map_err(|e| {
+        if e.kind() == io::ErrorKind::InvalidData {
+            return Error::NotUtf8 {
+                path: path.to_path_buf(),
+            };
+        }
+        Error::LoadPage {
+            path: path.to_path_buf(),
+            source: Box::new(Error::Io(e)),
+        }
     })?;
     Ok(Some(HomePage {
         body,
@@ -153,9 +160,14 @@ where
 
     let mut pages = Vec::with_capacity(entries.len());
     for path in entries {
-        let content = fs::read_to_string(&path).map_err(|e| Error::LoadPage {
-            path: path.clone(),
-            source: Box::new(Error::Io(e)),
+        let content = fs::read_to_string(&path).map_err(|e| {
+            if e.kind() == io::ErrorKind::InvalidData {
+                return Error::NotUtf8 { path: path.clone() };
+            }
+            Error::LoadPage {
+                path: path.clone(),
+                source: Box::new(Error::Io(e)),
+            }
         })?;
         let (fm, body) = frontmatter::parse::<F>(&content).map_err(|e| Error::LoadPage {
             path: path.clone(),
@@ -640,5 +652,23 @@ Body.
         let cfg = minimal_config(src);
         let site = Site::load(cfg).unwrap();
         assert_eq!(site.wiki.len(), 1);
+    }
+
+    #[test]
+    fn non_utf8_file_gives_clear_error() {
+        let dir = TempDir::new().unwrap();
+        let src = dir.path();
+
+        let bad_path = src.join("wiki/bad.md");
+        fs::create_dir_all(bad_path.parent().unwrap()).unwrap();
+        fs::write(&bad_path, b"\xff\xfe invalid utf8").unwrap();
+
+        let cfg = minimal_config(src);
+        let result = Site::load(cfg);
+        let err = match result {
+            Err(e) => e.to_string(),
+            Ok(_) => panic!("expected error for non-UTF-8 file"),
+        };
+        assert!(err.contains("not valid UTF-8"), "got: {err}");
     }
 }
