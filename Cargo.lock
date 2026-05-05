@@ -114,6 +114,7 @@ dependencies = [
  "pulldown-cmark",
  "quick-xml",
  "rayon",
+ "regex",
  "reqwest",
  "resvg",
  "serde",
