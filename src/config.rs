@@ -70,12 +70,26 @@ impl std::str::FromStr for Config {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let config = toml::from_str(s)?;
+        let config: Self = toml::from_str(s)?;
+        config.validate()?;
         Ok(config)
     }
 }
 
 impl Config {
+    fn validate(&self) -> Result<(), Error> {
+        if !self.base_url.starts_with("http://") && !self.base_url.starts_with("https://") {
+            return Err(Error::InvalidConfig {
+                field: "base_url",
+                message: format!(
+                    "must start with http:// or https://, got {:?}",
+                    self.base_url
+                ),
+            });
+        }
+        Ok(())
+    }
+
     pub fn from_path(path: &Path) -> Result<Self, Error> {
         let text = std::fs::read_to_string(path)?;
         let mut config: Self = text.parse()?;
@@ -190,6 +204,29 @@ mod tests {
     #[test]
     fn missing_base_url_is_error() {
         assert!(r#"title = "My Site""#.parse::<Config>().is_err());
+    }
+
+    #[test]
+    fn relative_base_url_is_error() {
+        let result = r#"
+            title = "My Site"
+            base_url = "/"
+            "#
+        .parse::<Config>();
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("base_url"));
+        assert!(err.contains("http"));
+    }
+
+    #[test]
+    fn bare_path_base_url_is_error() {
+        let result = r#"
+            title = "My Site"
+            base_url = "example.com"
+            "#
+        .parse::<Config>();
+        assert!(result.is_err());
     }
 
     #[test]
