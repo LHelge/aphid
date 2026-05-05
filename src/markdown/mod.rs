@@ -2,12 +2,14 @@ pub mod alerts;
 pub mod anchors;
 pub mod external_links;
 pub mod highlight;
+pub mod relative_urls;
 pub mod wikilinks;
 
 pub use alerts::rewrite_alerts;
 pub use anchors::{HeadingEntry, inject_heading_ids};
 pub use external_links::rewrite_external_links;
 pub use highlight::Highlighter;
+pub use relative_urls::rewrite_relative_urls;
 pub use wikilinks::{WikiLinkRef, extract_wiki_links, rewrite_wiki_links};
 
 use pulldown_cmark::{Options, Parser, html};
@@ -70,6 +72,7 @@ impl<'a> MarkdownRenderer<'a> {
     pub fn render(&self, body: &str) -> Rendered {
         let events: Vec<_> = Parser::new_ext(body, markdown_options()).collect();
 
+        let events = rewrite_relative_urls(events);
         let (events, broken_wiki_links) = rewrite_wiki_links(events, self.site);
         let events = rewrite_external_links(events);
         let events = rewrite_alerts(events);
