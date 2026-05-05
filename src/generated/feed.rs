@@ -9,8 +9,22 @@ use crate::content::frontmatter::BlogFrontmatter;
 use crate::content::page::{Page, PageKind};
 use crate::markdown::Rendered;
 
+use regex::Regex;
+use std::sync::LazyLock;
+
 const ATOM_NS: &str = "http://www.w3.org/2005/Atom";
 const DC_NS: &str = "http://purl.org/dc/elements/1.1/";
+
+static RELATIVE_URL_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(href|src)="(/[^"]*)"#).unwrap());
+
+fn absolutize_urls(html: &str, base: &str) -> String {
+    RELATIVE_URL_RE
+        .replace_all(html, |caps: &regex::Captures| {
+            format!("{}=\"{}{}\"", &caps[1], base, &caps[2])
+        })
+        .into_owned()
+}
 
 /// Convert a `NaiveDate` to midnight UTC and format as RFC 3339 (Atom).
 fn rfc3339(date: NaiveDate) -> String {
@@ -106,6 +120,7 @@ impl AtomFeed {
                 for (post, rendered) in entries {
                     let url = format!("{base}{}", PageKind::Blog.url_path(&post.slug));
                     let updated = post.frontmatter.updated.unwrap_or(post.frontmatter.created);
+                    let content = absolutize_urls(&rendered.html, base);
 
                     w.create_element("entry").write_inner_content(|w| {
                         w.create_element("title")
@@ -142,7 +157,7 @@ impl AtomFeed {
 
                         w.create_element("content")
                             .with_attribute(("type", "html"))
-                            .write_text_content(BytesText::new(&rendered.html))?;
+                            .write_text_content(BytesText::new(&content))?;
 
                         for tag in &post.frontmatter.tags {
                             w.create_element("category")
@@ -232,6 +247,7 @@ impl RssFeed {
                     // Items
                     for (post, rendered) in entries {
                         let url = format!("{base}{}", PageKind::Blog.url_path(&post.slug));
+                        let content = absolutize_urls(&rendered.html, base);
 
                         w.create_element("item").write_inner_content(|w| {
                             w.create_element("title")
@@ -253,7 +269,7 @@ impl RssFeed {
                                 .write_text_content(BytesText::new(&post.frontmatter.author))?;
 
                             w.create_element("description")
-                                .write_text_content(BytesText::new(&rendered.html))?;
+                                .write_text_content(BytesText::new(&content))?;
 
                             for tag in &post.frontmatter.tags {
                                 w.create_element("category")
@@ -461,5 +477,36 @@ mod tests {
 
         let rss = String::from_utf8(RssFeed::new(&site, &rendered).into_bytes()).unwrap();
         assert!(rss.contains("A &amp; B &lt;C&gt;"));
+    }
+
+    #[test]
+    fn absolutizes_relative_urls_in_content() {
+        let blog = vec![blog_post(
+            "links",
+            "Links Post",
+            NaiveDate::from_ymd_opt(2026, 4, 20).unwrap(),
+            vec![],
+        )];
+        let rendered = vec![rendered_html(
+            r#"<p><a href="/wiki/foo/">foo</a> and <img src="/static/img.png"/></p>"#,
+        )];
+        let site = Site::from_parts(test_config(), blog, vec![], vec![]).unwrap();
+
+        let atom = String::from_utf8(AtomFeed::new(&site, &rendered).into_bytes()).unwrap();
+        assert!(atom.contains("https://example.com/wiki/foo/"));
+        assert!(atom.contains("https://example.com/static/img.png"));
+        assert!(!atom.contains("href=&quot;/wiki/foo/"));
+        assert!(!atom.contains("src=&quot;/static/img.png"));
+
+        let rss = String::from_utf8(RssFeed::new(&site, &rendered).into_bytes()).unwrap();
+        assert!(rss.contains("https://example.com/wiki/foo/"));
+        assert!(rss.contains("https://example.com/static/img.png"));
+    }
+
+    #[test]
+    fn does_not_modify_absolute_urls() {
+        let html = r#"<a href="https://other.com/page">link</a>"#;
+        let result = absolutize_urls(html, "https://example.com");
+        assert_eq!(result, html);
     }
 }
