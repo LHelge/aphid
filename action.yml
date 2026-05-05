@@ -1,0 +1,76 @@
+name: 'Build with aphid'
+description: 'Download the aphid static site generator and build a site'
+branding:
+  icon: 'book-open'
+  color: 'green'
+
+inputs:
+  version:
+    description: 'aphid version to use (e.g. "v0.1.3"). Defaults to latest release.'
+    required: false
+    default: 'latest'
+  config:
+    description: 'Path to aphid.toml config file'
+    required: false
+    default: 'aphid.toml'
+  output:
+    description: 'Output directory for the built site'
+    required: false
+    default: 'dist'
+
+outputs:
+  version:
+    description: 'The aphid version that was installed'
+    value: ${{ steps.install.outputs.version }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Determine platform
+      id: platform
+      shell: bash
+      run: |
+        case "${{ runner.os }}-${{ runner.arch }}" in
+          Linux-X64)   target="x86_64-unknown-linux-gnu" ;;
+          Linux-ARM64) target="aarch64-unknown-linux-gnu" ;;
+          macOS-ARM64) target="aarch64-apple-darwin" ;;
+          Windows-X64) target="x86_64-pc-windows-msvc" ;;
+          *)
+            echo "::error::Unsupported platform: ${{ runner.os }}-${{ runner.arch }}"
+            exit 1
+            ;;
+        esac
+        echo "target=$target" >> "$GITHUB_OUTPUT"
+
+    - name: Install aphid
+      id: install
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        repo="LHelge/aphid"
+        version="${{ inputs.version }}"
+
+        if [ "$version" = "latest" ]; then
+          version=$(gh release view --repo "$repo" --json tagName -q .tagName)
+        fi
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
+        target="${{ steps.platform.outputs.target }}"
+        archive="aphid-${version}-${target}"
+
+        if [ "${{ runner.os }}" = "Windows" ]; then
+          gh release download "$version" --repo "$repo" --pattern "${archive}.zip"
+          unzip "${archive}.zip" -d "${{ runner.temp }}/aphid"
+        else
+          gh release download "$version" --repo "$repo" --pattern "${archive}.tar.gz"
+          mkdir -p "${{ runner.temp }}/aphid"
+          tar xzf "${archive}.tar.gz" -C "${{ runner.temp }}/aphid"
+        fi
+
+        echo "${{ runner.temp }}/aphid" >> "$GITHUB_PATH"
+        echo "::notice::Installed aphid $version for $target"
+
+    - name: Build site
+      shell: bash
+      run: aphid --config "${{ inputs.config }}" build --output "${{ inputs.output }}"
