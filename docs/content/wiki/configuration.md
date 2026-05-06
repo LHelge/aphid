@@ -85,7 +85,7 @@ All of these are written to the site root (`/favicon.ico`, `/apple-touch-icon.pn
 If `favicon` is not set, no files are generated and `favicon_tags` is empty.
 
 > [!NOTE]
-> The favicon is generated once at startup and is **not** regenerated when the source image changes during `aphid serve` — the resize/encode step takes long enough that running it on every file event would make live reload sluggish. Restart the server to pick up changes to the source image.
+> In `aphid serve`, the favicon set is cached and only regenerated when the source image's mtime changes. Editing markdown triggers a fast rebuild that reuses the cached set; saving a new `favicon.png` triggers a rebuild that detects the change and re-encodes (the resize step takes ~700 ms, but only when it actually has work to do).
 
 # Authors
 
