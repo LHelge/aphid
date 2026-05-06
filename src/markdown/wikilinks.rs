@@ -100,7 +100,7 @@ pub fn rewrite_wiki_links<'a>(
             let html = match site.get(&slug) {
                 Some(page) => {
                     let url = page.url_path();
-                    let text = display.unwrap_or_else(|| page.title().into_owned());
+                    let text = display.unwrap_or_else(|| page.title().to_owned());
                     format!(
                         "<a href=\"{}\" class=\"wikilink\">{}</a>",
                         url,

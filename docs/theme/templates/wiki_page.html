@@ -7,7 +7,7 @@
   <nav class="wiki-sidebar">
     {% for category in wiki_categories %}
     <div class="wiki-cat">
-      <div class="wiki-cat-name">{% if category.name %}{{ category.name }}{% else %}Other{% endif %}</div>
+      <div class="wiki-cat-name">{{ category.name }}</div>
       {% for page in category.pages %}
       <a href="{{ page.url }}" class="wiki-cat-link{% if page.url == url %} active{% endif %}">{{ page.title }}</a>
       {% endfor %}

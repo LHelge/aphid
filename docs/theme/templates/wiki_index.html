@@ -7,7 +7,7 @@
   <nav class="wiki-sidebar">
     {% for category in categories %}
     <div class="wiki-cat">
-      <div class="wiki-cat-name">{% if category.name %}{{ category.name }}{% else %}Other{% endif %}</div>
+      <div class="wiki-cat-name">{{ category.name }}</div>
       {% for page in category.pages %}
       <a href="{{ page.url }}" class="wiki-cat-link">{{ page.title }}</a>
       {% endfor %}
@@ -22,7 +22,7 @@
       {% for category in categories %}
       {% if category.pages | length > 0 %}
       <a href="{{ category.pages.0.url }}" class="wiki-cat-card">
-        <div class="wiki-cat-card-name">{% if category.name %}{{ category.name }}{% else %}Other{% endif %}</div>
+        <div class="wiki-cat-card-name">{{ category.name }}</div>
         <div class="wiki-cat-card-count">{{ category.pages | length }} page{% if category.pages | length != 1 %}s{% endif %}</div>
       </a>
       {% endif %}

@@ -30,6 +30,10 @@ fn default_posts_per_page() -> usize {
     10
 }
 
+fn default_wiki_default_category() -> String {
+    "Other".to_string()
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub title: String,
@@ -52,6 +56,11 @@ pub struct Config {
     /// last.
     #[serde(default)]
     pub wiki_categories: Vec<String>,
+    /// Display name used for wiki pages without a `category` in frontmatter.
+    /// Surfaces both as the page's own category label and as the heading
+    /// for the catch-all group on the wiki index. Defaults to `"Other"`.
+    #[serde(default = "default_wiki_default_category")]
+    pub wiki_default_category: String,
     /// Path to a source image (PNG, JPEG, SVG, etc.) used to generate
     /// favicons at standard sizes.
     pub favicon: Option<PathBuf>,
@@ -154,6 +163,7 @@ mod tests {
         assert!(cfg.authors.is_empty());
         assert!(cfg.socials.is_empty());
         assert!(cfg.wiki_categories.is_empty());
+        assert_eq!(cfg.wiki_default_category, "Other");
         assert_eq!(cfg.feed_limit, 20);
         assert_eq!(cfg.posts_per_page, 10);
     }

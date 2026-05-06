@@ -5,7 +5,7 @@ use std::{fs, io};
 use serde::de::DeserializeOwned;
 
 use super::frontmatter::{self, BlogFrontmatter, PageFrontmatter, WikiFrontmatter};
-use super::page::{Page, PageAny, PageKind};
+use super::page::{Page, PageKind, PageView};
 use super::slug::Slug;
 use crate::Error;
 use crate::config::Config;
@@ -115,12 +115,12 @@ impl<'a> SitePages<'a> {
             )
     }
 
-    fn iter_any(self) -> impl Iterator<Item = PageAny<'a>> {
+    fn iter_views(self) -> impl Iterator<Item = &'a dyn PageView> {
         self.blog
             .iter()
-            .map(PageAny::Blog)
-            .chain(self.wiki.iter().map(PageAny::Wiki))
-            .chain(self.pages.iter().map(PageAny::Page))
+            .map(|p| p as &dyn PageView)
+            .chain(self.wiki.iter().map(|p| p as &dyn PageView))
+            .chain(self.pages.iter().map(|p| p as &dyn PageView))
     }
 }
 
@@ -202,6 +202,12 @@ impl Site {
             stem(path)
         })?;
         let home = load_home(&src.join("home.md"))?;
+
+        for page in &mut wiki {
+            if page.frontmatter.title.is_empty() {
+                page.frontmatter.title = page.slug.to_title();
+            }
+        }
 
         blog.retain(|p| !p.frontmatter.draft);
         wiki.retain(|p| !p.frontmatter.draft);
@@ -306,23 +312,59 @@ impl Site {
         backlinks
     }
 
-    pub fn get(&self, slug: &Slug) -> Option<PageAny<'_>> {
+    pub fn get(&self, slug: &Slug) -> Option<&dyn PageView> {
         match self.slug_index.get(slug)? {
-            (PageKind::Blog, idx) => Some(PageAny::Blog(&self.blog[*idx])),
-            (PageKind::Wiki, idx) => Some(PageAny::Wiki(&self.wiki[*idx])),
-            (PageKind::Page, idx) => Some(PageAny::Page(&self.pages[*idx])),
+            (PageKind::Blog, idx) => Some(&self.blog[*idx] as &dyn PageView),
+            (PageKind::Wiki, idx) => Some(&self.wiki[*idx] as &dyn PageView),
+            (PageKind::Page, idx) => Some(&self.pages[*idx] as &dyn PageView),
         }
     }
 
-    pub fn iter_pages(&self) -> impl Iterator<Item = PageAny<'_>> {
-        SitePages::new(&self.blog, &self.wiki, &self.pages).iter_any()
+    pub fn iter_pages(&self) -> impl Iterator<Item = &dyn PageView> {
+        SitePages::new(&self.blog, &self.wiki, &self.pages).iter_views()
     }
 
-    pub fn backlinks_for(&self, slug: &Slug) -> Vec<PageAny<'_>> {
+    pub fn backlinks_for(&self, slug: &Slug) -> Vec<&dyn PageView> {
         self.backlinks
             .get(slug)
             .map(|sources| sources.iter().filter_map(|s| self.get(s)).collect())
             .unwrap_or_default()
+    }
+
+    /// Look up a blog post by slug. Returns `None` if the slug doesn't
+    /// resolve, or resolves to a non-blog page.
+    pub fn blog_post(&self, slug: &Slug) -> Option<&Page<BlogFrontmatter>> {
+        match self.slug_index.get(slug)? {
+            (PageKind::Blog, idx) => self.blog.get(*idx),
+            _ => None,
+        }
+    }
+
+    /// Look up a wiki page by slug. Returns `None` if the slug doesn't
+    /// resolve, or resolves to a non-wiki page.
+    pub fn wiki_page(&self, slug: &Slug) -> Option<&Page<WikiFrontmatter>> {
+        match self.slug_index.get(slug)? {
+            (PageKind::Wiki, idx) => self.wiki.get(*idx),
+            _ => None,
+        }
+    }
+
+    /// Find the posts one step newer and one step older than `page` in the
+    /// blog feed. `Site::blog` is sorted newest-first, so the newer
+    /// neighbour is at index `i - 1` and the older at `i + 1`.
+    pub fn blog_neighbours_of(
+        &self,
+        page: &Page<BlogFrontmatter>,
+    ) -> (
+        Option<&Page<BlogFrontmatter>>,
+        Option<&Page<BlogFrontmatter>>,
+    ) {
+        let Some(idx) = self.blog.iter().position(|p| p.slug == page.slug) else {
+            return (None, None);
+        };
+        let newer = idx.checked_sub(1).and_then(|i| self.blog.get(i));
+        let older = self.blog.get(idx + 1);
+        (newer, older)
     }
 }
 
@@ -336,7 +378,7 @@ mod tests {
 
     use super::*;
     use crate::content::frontmatter::{BlogFrontmatter, PageFrontmatter, WikiFrontmatter};
-    use crate::content::page::{Page, PageAny, PageKind};
+    use crate::content::page::{Page, PageKind, PageView};
     use crate::content::slug::Slug;
     use crate::testutil::write_file;
 
@@ -360,12 +402,13 @@ mod tests {
     }
 
     fn make_wiki_page(slug: &str) -> Page<WikiFrontmatter> {
+        let slug: Slug = slug.into();
         Page {
-            slug: slug.into(),
+            slug: slug.clone(),
             body: String::new(),
             path: PathBuf::from(format!("content/wiki/{slug}.md")),
             frontmatter: WikiFrontmatter {
-                title: None,
+                title: slug.to_title(),
                 category: None,
                 created: None,
                 updated: None,
@@ -410,18 +453,18 @@ mod tests {
             backlinks: HashMap::new(),
         };
 
-        assert!(matches!(
-            site.get(&Slug::from("post-one")),
-            Some(PageAny::Blog(_))
-        ));
-        assert!(matches!(
-            site.get(&Slug::from("glossary")),
-            Some(PageAny::Wiki(_))
-        ));
-        assert!(matches!(
-            site.get(&Slug::from("about")),
-            Some(PageAny::Page(_))
-        ));
+        assert_eq!(
+            site.get(&Slug::from("post-one")).map(PageView::kind),
+            Some(PageKind::Blog)
+        );
+        assert_eq!(
+            site.get(&Slug::from("glossary")).map(PageView::kind),
+            Some(PageKind::Wiki)
+        );
+        assert_eq!(
+            site.get(&Slug::from("about")).map(PageView::kind),
+            Some(PageKind::Page)
+        );
         assert!(site.get(&Slug::from("nonexistent")).is_none());
     }
 
