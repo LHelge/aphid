@@ -101,6 +101,7 @@ These come from `base.html` and are available in all templates via inheritance:
 | `tags` | list | Each tag has `name` and `slug` |
 | `newer_post` | object? | Adjacent post one step newer in the feed, or `null` on the newest post. Same shape as the post entries on `blog_index.html`. |
 | `older_post` | object? | Adjacent post one step older in the feed, or `null` on the oldest post. Same shape. |
+| `contains_mermaid` | bool | `true` when the body contains at least one ` ```mermaid ` block — gate the Mermaid runtime on this. See [Mermaid diagrams](#mermaid-diagrams) |
 
 ## wiki_page.html
 
@@ -123,6 +124,7 @@ Renders the site root (`/index.html`). Receives the post list plus an optional r
 |----------|------|-------------|
 | `posts` | list | All blog posts — see the post entry shape below |
 | `home` | object? | Present when `content/home.md` exists. Has `content` (string, the rendered HTML — pass through `\| safe`). |
+| `contains_mermaid` | bool | `true` when `home.md` contains at least one ` ```mermaid ` block. See [Mermaid diagrams](#mermaid-diagrams) |
 
 ## blog_index.html
 
@@ -186,3 +188,41 @@ Reference theme assets with an absolute path in templates:
 ## Syntax highlighting
 
 Code blocks are highlighted with CSS classes prefixed `hl-` (e.g. `hl-keyword`, `hl-string`, `hl-comment`). Your theme stylesheet must provide rules for these classes — otherwise code blocks will render in a single color. The default theme ships with [Catppuccin Mocha](https://catppuccin.com/) colors as a reference.
+
+## Mermaid diagrams
+
+` ```mermaid ` fenced blocks are emitted as `<pre class="mermaid">…</pre>` — they need a client-side runtime to render. `aphid` bundles `mermaid.min.js` and writes it to `/static/js/mermaid.min.js` on every build, but **loading and initialising it is the theme's responsibility**: `base.html` must include the script and call `mermaid.initialize(...)` so a theme without diagram support can skip the payload entirely.
+
+Each page context exposes a `contains_mermaid` boolean (`true` when the body has at least one mermaid block). Gate the runtime on this so pages without diagrams don't pay the download cost:
+
+```html
+{% if contains_mermaid %}
+<script src="/static/js/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true });</script>
+{% endif %}
+```
+
+Pass any extra options (theme colors, flowchart config, …) into `mermaid.initialize`. To match diagrams to your site palette, set `theme: 'base'` and override `themeVariables`:
+
+```html
+{% if contains_mermaid %}
+<script src="/static/js/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      darkMode: true,
+      background: '#1e1e2e',
+      primaryColor: '#313244',
+      primaryTextColor: '#cdd6f4',
+      primaryBorderColor: '#cba6f7',
+      lineColor: '#b4befe',
+      textColor: '#cdd6f4',
+    },
+  });
+</script>
+{% endif %}
+```
+
+See the [Mermaid theming docs](https://mermaid.js.org/config/theming.html) for the full set of `themeVariables` keys (sequence, flowchart, class, state, and Gantt diagrams each expose their own colour knobs). The docs theme's `base.html` is a worked example using a Catppuccin Mocha palette.

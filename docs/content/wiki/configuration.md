@@ -23,6 +23,7 @@ tags:
 | `static_dir` | `"static"` | User static files copied to the output's `static/` directory |
 | `theme_dir` | *(embedded)* | Path to a custom theme directory |
 | `wiki_categories` | `[]` | Order for wiki category headings — see [Wiki category order](#wiki-category-order) |
+| `favicon` | | Path to a source image used to generate favicons at standard sizes — see [Favicon](#favicon) |
 | `feed_limit` | `20` | Maximum number of blog posts in RSS/Atom feeds. Set to `0` to include all posts |
 | `posts_per_page` | `10` | Posts shown per page on the blog index and tag pages — see [[pagination]] |
 
@@ -56,6 +57,29 @@ wiki_categories = ["Getting Started", "Content", "Customization", "Development"]
 
 Categories listed here appear in this order. Any wiki category not in the list falls through to alphabetical placement after the listed ones, and uncategorised pages stay last. Adding a new category that isn't in `wiki_categories` is safe — it just shows up at the bottom until you order it.
 
+# Favicon
+
+Set `favicon` to a single source image and `aphid` generates the full set of platform icons at build time:
+
+```toml
+favicon = "static/favicon.png"
+```
+
+The source can be a raster image (PNG, JPEG, …) or an SVG; SVGs are rasterised at 512 px via `resvg`. From that single source, the build emits:
+
+- `favicon.ico` — multi-resolution ICO containing 16 px and 32 px frames
+- `apple-touch-icon.png` — 180 px
+- `android-chrome-192x192.png` — 192 px
+- `android-chrome-512x512.png` — 512 px
+- `site.webmanifest` — references the two Android icons and uses the site `title` as the app name
+
+All of these are written to the site root (`/favicon.ico`, `/apple-touch-icon.png`, …). The matching `<link>` tags are exposed to templates as `favicon_tags`; render them in your `<head>` with `{{ favicon_tags | safe }}`. See [[themes]] for the full list of template variables.
+
+If `favicon` is not set, no files are generated and `favicon_tags` is empty.
+
+> [!NOTE]
+> The favicon is generated once at startup and is **not** regenerated when the source image changes during `aphid serve` — the resize/encode step takes long enough that running it on every file event would make live reload sluggish. Restart the server to pick up changes to the source image.
+
 # Authors
 
 ```toml
@@ -79,6 +103,7 @@ title = "My Site"
 base_url = "https://example.com"
 description = "A blog about interesting things"
 source_dir = "content"
+favicon = "static/favicon.png"
 
 [[authors]]
 name = "Alice"
