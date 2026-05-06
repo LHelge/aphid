@@ -1,11 +1,12 @@
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher, event::ModifyKind};
 use tokio::sync::mpsc;
 
 use super::AppState;
+use super::rebuilder::Rebuilder;
 use crate::Error;
 use crate::config::Config;
 
@@ -18,7 +19,7 @@ pub(crate) struct ContentWatcher {
 }
 
 impl ContentWatcher {
-    pub fn new(config: &Config) -> Result<Self, Error> {
+    pub fn new(config: &Config, config_path: &Path) -> Result<Self, Error> {
         let (tx, rx) = mpsc::channel::<()>(1);
 
         let mut watcher = RecommendedWatcher::new(
@@ -44,6 +45,15 @@ impl ContentWatcher {
             }
         }
 
+        // Watch aphid.toml itself so config edits — favicon path swap,
+        // title change, posts_per_page, wiki_default_category — also
+        // trigger rebuilds. Rebuilder::next_rendered reloads from disk
+        // every time, so the new values flow through naturally.
+        if config_path.is_file() {
+            tracing::debug!(path = %config_path.display(), "watching config file");
+            watcher.watch(config_path, RecursiveMode::NonRecursive)?;
+        }
+
         tracing::info!("file watcher started");
         Ok(Self {
             _watcher: watcher,
@@ -51,7 +61,11 @@ impl ContentWatcher {
         })
     }
 
-    pub async fn run(&mut self, config_path: &Path, state: &Arc<AppState>) -> Result<(), Error> {
+    pub async fn run(
+        &mut self,
+        rebuilder: &mut Rebuilder,
+        state: &Arc<AppState>,
+    ) -> Result<(), Error> {
         // Pinned across iterations: once registered as a waiter, the future
         // stays in `Notify`'s waker list and reliably observes a later
         // `notify_waiters()` even if it fired while we were rebuilding.
@@ -72,8 +86,16 @@ impl ContentWatcher {
                     self.debounce().await;
 
                     tracing::info!("file change detected, rebuilding…");
-                    if let Err(e) = state.rebuild(config_path).await {
-                        tracing::error!("rebuild failed: {e}");
+                    let start = Instant::now();
+                    match rebuilder.next_rendered() {
+                        Ok(rendered) => {
+                            state.swap(rendered).await;
+                            tracing::info!(
+                                "rebuild complete in {}ms",
+                                start.elapsed().as_millis()
+                            );
+                        }
+                        Err(e) => tracing::error!("rebuild failed: {e}"),
                     }
                 }
             }

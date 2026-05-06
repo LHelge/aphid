@@ -1,4 +1,5 @@
 pub(crate) mod livereload;
+mod rebuilder;
 mod server;
 mod state;
 mod watcher;

@@ -1,5 +1,5 @@
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -13,6 +13,7 @@ use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
 
 use super::livereload;
+use super::rebuilder::{Rebuilder, favicon_mtime};
 use super::state::AppState;
 use super::watcher;
 use crate::Error;
@@ -26,7 +27,9 @@ pub struct Server {
     state: Arc<AppState>,
     router: Router,
     config: Config,
-    config_path: PathBuf,
+    /// Owns the per-rebuild state (config path, cached favicon). Moved
+    /// into the spawned watcher task by `start_watcher`; absent thereafter.
+    rebuilder: Option<Rebuilder>,
 }
 
 impl Server {
@@ -35,27 +38,31 @@ impl Server {
         let config = Config::from_path(config_path)?;
         let theme = Theme::load(&config)?;
 
-        let favicon = config
-            .favicon
-            .as_ref()
-            .map(|p| FaviconSet::generate(p, &config.title))
-            .transpose()?;
+        let initial_favicon = match &config.favicon {
+            Some(path) => {
+                let mtime = favicon_mtime(path)?;
+                let set = FaviconSet::generate(path, &config.title)?;
+                Some((set, path.clone(), mtime))
+            }
+            None => None,
+        };
+        let favicon_set = initial_favicon.as_ref().map(|(set, _, _)| set.clone());
 
-        let rendered =
-            RenderedSite::build_with_favicon(&config, &theme, Mode::Serve, favicon.clone())?;
-        let state = Arc::new(AppState::new(rendered, favicon));
+        let rendered = RenderedSite::build_with_favicon(&config, &theme, Mode::Serve, favicon_set)?;
+        let state = Arc::new(AppState::new(rendered));
+        let rebuilder = Rebuilder::with_initial_favicon(config_path.to_path_buf(), initial_favicon);
         let router = Self::build_router(Arc::clone(&state), &config);
         Ok(Self {
             state,
             router,
             config,
-            config_path: config_path.to_path_buf(),
+            rebuilder: Some(rebuilder),
         })
     }
 
     /// Bind on `0.0.0.0:port`, start the file watcher, and serve until the
     /// process receives ctrl-c.
-    pub async fn run(self, port: u16) -> Result<(), Error> {
+    pub async fn run(mut self, port: u16) -> Result<(), Error> {
         let watcher_handle = self.start_watcher()?;
 
         let addr = SocketAddr::from(([0, 0, 0, 0], port));
@@ -89,7 +96,7 @@ impl Server {
     /// `(port, state, server_task, watcher_task)` — both tasks should be
     /// aborted when the test ends.
     pub async fn spawn_test_with_watcher(
-        self,
+        mut self,
     ) -> Result<(u16, Arc<AppState>, JoinHandle<()>, JoinHandle<()>), Error> {
         let watcher_handle = self.start_watcher()?;
         let (port, state, server_handle) = self.spawn_test_server().await?;
@@ -111,13 +118,19 @@ impl Server {
     }
 
     /// Spawn the file watcher in a background task. Used by both
-    /// production `run` and the watcher-enabled test variant.
-    fn start_watcher(&self) -> Result<JoinHandle<()>, Error> {
+    /// production `run` and the watcher-enabled test variant. Moves the
+    /// `Rebuilder` into the spawned task — calling twice on the same
+    /// `Server` would panic (and is unreachable in current call paths).
+    fn start_watcher(&mut self) -> Result<JoinHandle<()>, Error> {
+        let mut rebuilder = self
+            .rebuilder
+            .take()
+            .expect("start_watcher called twice on the same Server");
         let watch_state = Arc::clone(&self.state);
-        let watch_config_path = self.config_path.clone();
-        let mut content_watcher = watcher::ContentWatcher::new(&self.config)?;
+        let mut content_watcher =
+            watcher::ContentWatcher::new(&self.config, rebuilder.config_path())?;
         Ok(tokio::task::spawn(async move {
-            if let Err(e) = content_watcher.run(&watch_config_path, &watch_state).await {
+            if let Err(e) = content_watcher.run(&mut rebuilder, &watch_state).await {
                 tracing::error!("file watcher failed: {e}");
             }
         }))
