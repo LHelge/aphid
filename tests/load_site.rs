@@ -3,7 +3,7 @@ use std::fs;
 use tempfile::TempDir;
 
 use aphid::Error;
-use aphid::content::{PageAny, Site, Slug};
+use aphid::content::{PageKind, PageView, Site, Slug};
 
 mod common;
 
@@ -36,30 +36,13 @@ fn page_counts_and_slugs() {
 fn site_get_resolves_all_variants() {
     let site = Site::load(fixtures_config()).unwrap();
 
-    assert!(matches!(
-        site.get(&Slug::from("first-post")),
-        Some(PageAny::Blog(_))
-    ));
-    assert!(matches!(
-        site.get(&Slug::from("second-post")),
-        Some(PageAny::Blog(_))
-    ));
-    assert!(matches!(
-        site.get(&Slug::from("glossary")),
-        Some(PageAny::Wiki(_))
-    ));
-    assert!(matches!(
-        site.get(&Slug::from("syntax")),
-        Some(PageAny::Wiki(_))
-    ));
-    assert!(matches!(
-        site.get(&Slug::from("internals")),
-        Some(PageAny::Wiki(_))
-    ));
-    assert!(matches!(
-        site.get(&Slug::from("about")),
-        Some(PageAny::Page(_))
-    ));
+    let kind_of = |slug: &str| site.get(&Slug::from(slug)).map(PageView::kind);
+    assert_eq!(kind_of("first-post"), Some(PageKind::Blog));
+    assert_eq!(kind_of("second-post"), Some(PageKind::Blog));
+    assert_eq!(kind_of("glossary"), Some(PageKind::Wiki));
+    assert_eq!(kind_of("syntax"), Some(PageKind::Wiki));
+    assert_eq!(kind_of("internals"), Some(PageKind::Wiki));
+    assert_eq!(kind_of("about"), Some(PageKind::Page));
     assert!(site.get(&Slug::from("nonexistent")).is_none());
 }
 

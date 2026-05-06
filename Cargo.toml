@@ -1,6 +1,6 @@
 [package]
 name = "aphid"
-version = "0.1.4"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.94"
 description = "A static site generator for blogs and wikis, with wiki-links across both."

@@ -2,7 +2,10 @@
 
 {% block content %}
 <article class="wiki-page">
-    <h1>{{ title }}</h1>
+    <header>
+        <h1>{{ title }}</h1>
+        <p class="wiki-category"><a href="/wiki/">Wiki</a> &rsaquo; {{ category }}</p>
+    </header>
 
     <div class="wiki-layout">
         {% if toc | length > 0 %}

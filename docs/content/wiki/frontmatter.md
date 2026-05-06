@@ -57,7 +57,9 @@ tags:
 ---
 ```
 
-When `category` is set, the wiki index groups pages under category headings. Pages without a category appear in an "Uncategorized" section at the end.
+When `category` is set, the wiki index groups pages under category headings. Pages without a category fall into a catch-all group named by [`wiki_default_category`][cfg] (default `"Other"`), which sorts last on the index.
+
+[cfg]: /wiki/configuration/#optional-fields
 
 Wiki pages live at `/wiki/<stem>/` regardless of category — the category is purely for display grouping.
 

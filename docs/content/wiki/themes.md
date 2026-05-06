@@ -85,36 +85,46 @@ These come from `base.html` and are available in all templates via inheritance:
 | `feed_atom_url` | string | Absolute URL to the Atom feed (`/feed.xml`) |
 | `feed_rss_url` | string | Absolute URL to the RSS feed (`/rss.xml`) |
 
-## blog_post.html
+## Universal page variables
+
+These appear on every page template (`blog_post.html`, `wiki_page.html`, `page.html`):
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `title` | string | Post title from frontmatter |
+| `title` | string | Page title — from frontmatter, or for wiki pages the slug-derived title when frontmatter omits one |
 | `url` | string | Clean URL, e.g. `/blog/my-post/` |
 | `content` | string | Rendered HTML body |
-| `toc` | list | Heading entries; each has `level`, `text`, and `id` |
-| `backlinks` | list | Pages that link here; each has `title` and `url` |
-| `author` | string? | From frontmatter |
+| `toc` | list | Heading entries; each has `level`, `text`, and `id`. Always present (may be empty) |
+| `contains_mermaid` | bool | `true` when the body contains at least one ` ```mermaid ` block — gate the Mermaid runtime on this. See [Mermaid diagrams](#mermaid-diagrams) |
+
+## blog_post.html
+
+Universal page variables, plus:
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `author` | string | From frontmatter |
 | `image` | string? | Hero/headline image path or URL, from frontmatter |
-| `created` | string? | Publication date, formatted `YYYY-MM-DD` |
+| `description` | string? | Short summary, from frontmatter |
+| `created` | string | Publication date, formatted `YYYY-MM-DD` |
 | `updated` | string? | Last-edited date |
 | `tags` | list | Each tag has `name` and `slug` |
 | `newer_post` | object? | Adjacent post one step newer in the feed, or `null` on the newest post. Same shape as the post entries on `blog_index.html`. |
 | `older_post` | object? | Adjacent post one step older in the feed, or `null` on the oldest post. Same shape. |
-| `contains_mermaid` | bool | `true` when the body contains at least one ` ```mermaid ` block — gate the Mermaid runtime on this. See [Mermaid diagrams](#mermaid-diagrams) |
 
 ## wiki_page.html
 
-Same variables as `blog_post.html`. `author` and `image` are always absent; `created`, `updated`, and `tags` are present only if set in frontmatter. In addition:
+Universal page variables, plus:
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `category` | string? | Category for this page, from frontmatter |
-| `wiki_categories` | list | All wiki pages grouped by category — for rendering a sidebar with the current page highlighted (compare `page.url == url`). Each entry has `name` (string?) and `pages` (list of `{title, url}`). Named categories come first alphabetically; uncategorised pages are grouped under `name = null` at the end. |
+| `category` | string | Category for this page. Falls back to `wiki_default_category` (default `"Other"`) when frontmatter omits it, so always non-empty |
+| `backlinks` | list | Pages that link here via `[[wiki-link]]`. Each has `title` and `url` |
+| `wiki_categories` | list | All wiki pages grouped by category — for rendering a sidebar with the current page highlighted (compare `page.url == url`). Each entry has `name` (string) and `pages` (list of `{title, url}`). Named categories come first in `wiki_categories` order, then alphabetical; the default catch-all group sorts last. |
 
 ## page.html
 
-Same variables as `blog_post.html`. `author`, `image`, `created`, `updated`, and `tags` are always absent.
+Just the universal page variables — no extras.
 
 ## home.html
 
@@ -152,7 +162,7 @@ Each entry in `posts` (and on `tag.html`) has:
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `categories` | list | All wiki pages grouped by category. Each entry has `name` (string?) and `pages` (list of `{title, url}`). Named categories come first alphabetically; uncategorised pages are grouped under `name = null` at the end. |
+| `categories` | list | All wiki pages grouped by category. Each entry has `name` (string) and `pages` (list of `{title, url}`). Named categories come first in `wiki_categories` order, then alphabetical; the default catch-all group (`wiki_default_category`, default `"Other"`) sorts last. |
 
 ## tag.html
 

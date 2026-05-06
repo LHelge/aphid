@@ -34,12 +34,13 @@ fn blog_page(slug: &str, title: &str, body: &str) -> Page<BlogFrontmatter> {
 }
 
 fn wiki_page(slug: &str, body: &str) -> Page<WikiFrontmatter> {
+    let slug: aphid::content::Slug = slug.into();
     Page {
-        slug: slug.into(),
+        slug: slug.clone(),
         body: body.into(),
         path: PathBuf::from(format!("content/wiki/{slug}.md")),
         frontmatter: WikiFrontmatter {
-            title: None,
+            title: slug.to_title(),
             category: None,
             created: None,
             updated: None,

@@ -63,16 +63,6 @@
       </nav>
       {% endif %}
 
-      {% if backlinks | length > 0 %}
-      <div class="backlinks">
-        <div class="backlinks-label">Linked from</div>
-        <ul class="backlinks-list">
-          {% for link in backlinks %}
-          <li><a href="{{ link.url }}">{{ link.title }}</a></li>
-          {% endfor %}
-        </ul>
-      </div>
-      {% endif %}
     </article>
 
     {% if toc | length > 0 %}

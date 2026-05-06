@@ -23,6 +23,7 @@ tags:
 | `static_dir` | `"static"` | User static files copied to the output's `static/` directory |
 | `theme_dir` | *(embedded)* | Path to a custom theme directory |
 | `wiki_categories` | `[]` | Order for wiki category headings — see [Wiki category order](#wiki-category-order) |
+| `wiki_default_category` | `"Other"` | Display name for wiki pages without an explicit `category` in frontmatter. Surfaces both as the page's own category label and as the heading for the catch-all group on the wiki index |
 | `favicon` | | Path to a source image used to generate favicons at standard sizes — see [Favicon](#favicon) |
 | `feed_limit` | `20` | Maximum number of blog posts in RSS/Atom feeds. Set to `0` to include all posts |
 | `posts_per_page` | `10` | Posts shown per page on the blog index and tag pages — see [[pagination]] |
@@ -49,13 +50,19 @@ See [[frontmatter]] for the fields required by each content type.
 
 # Wiki category order
 
-By default, wiki categories on the wiki index are sorted alphabetically, with uncategorised pages last. To pin a specific order, list the categories in `wiki_categories`:
+By default, wiki categories on the wiki index are sorted alphabetically, with uncategorised pages last. Wiki pages without a `category` in frontmatter fall into a catch-all group named by `wiki_default_category` (default `"Other"`):
+
+```toml
+wiki_default_category = "Misc"
+```
+
+To pin a specific order for named categories, list them in `wiki_categories`:
 
 ```toml
 wiki_categories = ["Getting Started", "Content", "Customization", "Development"]
 ```
 
-Categories listed here appear in this order. Any wiki category not in the list falls through to alphabetical placement after the listed ones, and uncategorised pages stay last. Adding a new category that isn't in `wiki_categories` is safe — it just shows up at the bottom until you order it.
+Categories listed here appear in this order. Any wiki category not in the list falls through to alphabetical placement after the listed ones, and the default catch-all group stays last. Adding a new category that isn't in `wiki_categories` is safe — it just shows up at the bottom until you order it.
 
 # Favicon
 

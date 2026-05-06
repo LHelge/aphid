@@ -27,13 +27,16 @@ pub struct BlogFrontmatter {
     pub draft: bool,
 }
 
-/// Frontmatter for a wiki page. Title is optional — when omitted, the
-/// page derives its title from the filename stem (`battery-pack` →
-/// "Battery Pack"). Category is optional — when present, the wiki index
-/// groups pages under category headings.
+/// Frontmatter for a wiki page. `title` may be omitted in YAML — the
+/// loader fills it from the filename stem (`battery-pack` → "Battery
+/// Pack"). After loading, `title` is always non-empty. `category` is
+/// optional — when present, the wiki index groups pages under category
+/// headings; when absent, pages fall into the configured default
+/// category (see `Config::wiki_default_category`).
 #[derive(Debug, Deserialize)]
 pub struct WikiFrontmatter {
-    pub title: Option<String>,
+    #[serde(default)]
+    pub title: String,
     pub category: Option<String>,
     pub created: Option<NaiveDate>,
     pub updated: Option<NaiveDate>,
@@ -183,7 +186,7 @@ Body.
         // pulldown-cmark requires at least one character inside the delimiters.
         let input = "---\n{}\n---\n\nSome body.\n";
         let (fm, body): (WikiFrontmatter, String) = parse(input).unwrap();
-        assert!(fm.title.is_none());
+        assert!(fm.title.is_empty());
         assert!(fm.tags.is_empty());
         assert!(body.contains("Some body"));
     }

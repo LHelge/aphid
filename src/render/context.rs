@@ -5,13 +5,9 @@ use serde::Serialize;
 use crate::config::{Config, Social};
 use crate::content::page::{Page, PageKind};
 use crate::content::slug::Slug;
-use crate::content::{PageAny, PageFrontmatter, Site, WikiFrontmatter};
+use crate::content::{BlogFrontmatter, PageFrontmatter, PageView, Site, WikiFrontmatter};
 use crate::generated::FaviconSet;
 use crate::markdown::{HeadingEntry, Rendered};
-
-fn owned(value: Option<&str>) -> Option<String> {
-    value.map(str::to_owned)
-}
 
 /// A single nav entry for standalone pages, available to all templates.
 #[derive(Debug, Clone, Serialize)]
@@ -74,10 +70,10 @@ pub struct BacklinkEntry {
     pub url: String,
 }
 
-impl From<&PageAny<'_>> for BacklinkEntry {
-    fn from(page: &PageAny<'_>) -> Self {
+impl BacklinkEntry {
+    fn from_view(page: &dyn PageView) -> Self {
         Self {
-            title: page.title().into_owned(),
+            title: page.title().to_string(),
             url: page.url_path(),
         }
     }
@@ -105,7 +101,10 @@ impl TagRef {
     }
 }
 
-/// A blog post summary for index/tag listing pages.
+/// A page summary for index/tag listing pages. Carries the union of
+/// fields any kind of listed page might want to show — blog posts
+/// populate everything; wiki pages contribute what they have and leave
+/// the blog-specific fields empty.
 #[derive(Debug, Clone, Serialize)]
 pub struct PostEntry {
     pub title: String,
@@ -117,25 +116,32 @@ pub struct PostEntry {
 }
 
 impl PostEntry {
-    /// Build a `PostEntry` from any kind of page. Image, description, and
-    /// tags are populated only for blog posts; other kinds get `None` /
-    /// empty.
-    pub fn from_page(any: &PageAny<'_>) -> Self {
+    pub fn from_blog_page(page: &Page<BlogFrontmatter>) -> Self {
         Self {
-            title: any.title().into_owned(),
-            url: any.url_path(),
-            created: any.created(),
-            image: owned(any.image()),
-            description: owned(any.description()),
-            tags: TagRef::from_tags(any.tags()),
+            title: page.frontmatter.title.clone(),
+            url: page.url_path(),
+            created: Some(page.frontmatter.created.to_string()),
+            image: page.frontmatter.image.clone(),
+            description: page.frontmatter.description.clone(),
+            tags: TagRef::from_tags(&page.frontmatter.tags),
         }
     }
 
-    pub fn from_pages<'a>(pages: impl IntoIterator<Item = PageAny<'a>>) -> Vec<Self> {
-        pages
-            .into_iter()
-            .map(|page| Self::from_page(&page))
-            .collect()
+    pub fn from_wiki_page(page: &Page<WikiFrontmatter>) -> Self {
+        Self {
+            title: page.frontmatter.title.clone(),
+            url: page.url_path(),
+            created: page.frontmatter.created.map(|d| d.to_string()),
+            image: None,
+            description: None,
+            tags: TagRef::from_tags(&page.frontmatter.tags),
+        }
+    }
+
+    pub fn from_blog_pages<'a>(
+        pages: impl IntoIterator<Item = &'a Page<BlogFrontmatter>>,
+    ) -> Vec<Self> {
+        pages.into_iter().map(Self::from_blog_page).collect()
     }
 }
 
@@ -219,8 +225,8 @@ impl From<&Rendered> for HomeContent {
 
 /// Context for the home page (`/`). Same posts as the blog index, plus
 /// the optional rendered home-page content. `contains_mermaid` mirrors
-/// the field on `PageContext` so `base.html` can use one check across
-/// all page types.
+/// the field on the page contexts so `base.html` can use one check
+/// across all page types.
 #[derive(Debug, Serialize)]
 pub struct HomeContext {
     #[serde(flatten)]
@@ -240,16 +246,19 @@ pub struct WikiEntry {
 impl From<&Page<WikiFrontmatter>> for WikiEntry {
     fn from(page: &Page<WikiFrontmatter>) -> Self {
         Self {
-            title: page.title().to_string(),
+            title: page.frontmatter.title.clone(),
             url: page.url_path(),
         }
     }
 }
 
-/// A group of wiki pages sharing the same category.
+/// A group of wiki pages sharing the same category. Pages without an
+/// explicit category in frontmatter land under
+/// `Config::wiki_default_category` ("Other" by default), so this
+/// `name` is always populated.
 #[derive(Debug, Clone, Serialize)]
 pub struct WikiCategory {
-    pub name: Option<String>,
+    pub name: String,
     pub pages: Vec<WikiEntry>,
 }
 
@@ -257,20 +266,17 @@ pub struct WikiCategory {
 enum WikiCategoryOrder {
     Configured(usize),
     Alphabetical(String),
-    Uncategorized,
+    Default,
 }
 
 impl WikiCategoryOrder {
-    fn from_name(name: Option<&str>, configured_order: &[String]) -> Self {
-        match name {
-            Some(name) => match configured_order
-                .iter()
-                .position(|configured| configured == name)
-            {
-                Some(index) => Self::Configured(index),
-                None => Self::Alphabetical(name.to_owned()),
-            },
-            None => Self::Uncategorized,
+    fn from_name(name: &str, default_name: &str, configured_order: &[String]) -> Self {
+        if name == default_name {
+            return Self::Default;
+        }
+        match configured_order.iter().position(|c| c == name) {
+            Some(i) => Self::Configured(i),
+            None => Self::Alphabetical(name.to_owned()),
         }
     }
 }
@@ -278,27 +284,33 @@ impl WikiCategoryOrder {
 impl WikiCategory {
     /// Group every wiki page in `site` by category. Pages within each
     /// category are sorted by title. Categories listed in
-    /// `config.wiki_categories` come first in that order; named categories
-    /// not listed fall through alphabetically; uncategorised pages last.
+    /// `config.wiki_categories` come first in that order; other named
+    /// categories fall through alphabetically; the default catch-all
+    /// category (config.wiki_default_category) sorts last.
     pub fn from_site(site: &Site) -> Vec<Self> {
-        let mut by_category: HashMap<Option<String>, Vec<WikiEntry>> = HashMap::new();
+        let default = &site.config.wiki_default_category;
+        let mut by_category: HashMap<String, Vec<WikiEntry>> = HashMap::new();
         for p in &site.wiki {
+            let name = p
+                .frontmatter
+                .category
+                .clone()
+                .unwrap_or_else(|| default.clone());
             by_category
-                .entry(p.frontmatter.category.clone())
+                .entry(name)
                 .or_default()
                 .push(WikiEntry::from(p));
         }
         for entries in by_category.values_mut() {
             entries.sort_by(|a, b| a.title.cmp(&b.title));
         }
+        let order = &site.config.wiki_categories;
         let mut categories: Vec<Self> = by_category
             .into_iter()
             .map(|(name, pages)| Self { name, pages })
             .collect();
-        let order = &site.config.wiki_categories;
-        categories.sort_by_cached_key(|category| {
-            WikiCategoryOrder::from_name(category.name.as_deref(), order)
-        });
+        categories
+            .sort_by_cached_key(|cat| WikiCategoryOrder::from_name(&cat.name, default, order));
         categories
     }
 }
@@ -391,107 +403,130 @@ impl SiteContext {
     }
 }
 
-/// The full template context for rendering a single page.
-#[derive(Debug, Serialize)]
-pub struct PageContext {
+/// The base context every page template receives: shared site fields
+/// plus the universal page fields (title, URL, rendered body, table of
+/// contents, mermaid flag). Standalone pages render with this directly;
+/// wiki and blog page contexts embed it via `#[serde(flatten)]`.
+#[derive(Debug, Clone, Serialize)]
+pub struct StandalonePageContext {
     #[serde(flatten)]
     pub site: SiteContext,
-
-    // Page-level
     pub title: String,
     pub url: String,
-    pub kind: PageKind,
     pub content: String,
     pub toc: Vec<TocEntry>,
-    pub backlinks: Vec<BacklinkEntry>,
-    /// `true` when the page body contains at least one ` ```mermaid `
-    /// block. Templates use this to load the Mermaid runtime only on the
-    /// pages that need it.
     pub contains_mermaid: bool,
-
-    // Wiki-specific (None / empty for blog/page)
-    pub category: Option<String>,
-    pub wiki_categories: Vec<WikiCategory>,
-
-    // Blog-specific (None for wiki/page)
-    pub author: Option<String>,
-    pub image: Option<String>,
-    pub description: Option<String>,
-    pub created: Option<String>,
-    pub updated: Option<String>,
-    pub tags: Vec<TagRef>,
-    /// Adjacent post one step newer than this one in the blog feed.
-    /// `None` on non-blog pages and on the newest blog post.
-    pub newer_post: Option<PostEntry>,
-    /// Adjacent post one step older than this one in the blog feed.
-    /// `None` on non-blog pages and on the oldest blog post.
-    pub older_post: Option<PostEntry>,
 }
 
-impl PageContext {
+impl StandalonePageContext {
     pub fn from_page(
-        page: &PageAny<'_>,
+        page: &Page<PageFrontmatter>,
+        rendered: &Rendered,
+        site_ctx: &SiteContext,
+    ) -> Self {
+        Self {
+            site: site_ctx.clone(),
+            title: page.frontmatter.title.clone(),
+            url: page.url_path(),
+            content: rendered.html.clone(),
+            toc: TocEntry::from_headings(&rendered.toc),
+            contains_mermaid: rendered.contains_mermaid,
+        }
+    }
+}
+
+/// Template context for a single wiki page.
+#[derive(Debug, Serialize)]
+pub struct WikiPageContext {
+    #[serde(flatten)]
+    pub base: StandalonePageContext,
+    pub category: String,
+    pub backlinks: Vec<BacklinkEntry>,
+    pub wiki_categories: Vec<WikiCategory>,
+}
+
+impl WikiPageContext {
+    pub fn from_page(
+        page: &Page<WikiFrontmatter>,
         rendered: &Rendered,
         site: &Site,
         site_ctx: &SiteContext,
-        wiki_categories: &[WikiCategory],
+        wiki_categories: Vec<WikiCategory>,
     ) -> Self {
-        let (newer_post, older_post) = blog_neighbours(page, site);
-        Self {
+        let category = page
+            .frontmatter
+            .category
+            .clone()
+            .unwrap_or_else(|| site.config.wiki_default_category.clone());
+        let backlinks = site
+            .backlinks_for(&page.slug)
+            .into_iter()
+            .map(BacklinkEntry::from_view)
+            .collect();
+        let base = StandalonePageContext {
             site: site_ctx.clone(),
-            title: page.title().into_owned(),
+            title: page.frontmatter.title.clone(),
             url: page.url_path(),
-            kind: page.kind(),
             content: rendered.html.clone(),
             toc: TocEntry::from_headings(&rendered.toc),
-            backlinks: site
-                .backlinks_for(page.slug())
-                .iter()
-                .map(BacklinkEntry::from)
-                .collect(),
             contains_mermaid: rendered.contains_mermaid,
-            category: owned(page.category()),
-            wiki_categories: match page.kind() {
-                PageKind::Wiki => wiki_categories.to_vec(),
-                _ => Vec::new(),
-            },
-            author: owned(page.author()),
-            image: owned(page.image()),
-            description: owned(page.description()),
-            created: page.created(),
-            updated: page.updated(),
-            tags: TagRef::from_tags(page.tags()),
-            newer_post,
-            older_post,
+        };
+        Self {
+            base,
+            category,
+            backlinks,
+            wiki_categories,
         }
-    }
-
-    pub(super) fn template_name(&self) -> &'static str {
-        self.kind.template_name()
     }
 }
 
-/// Find the posts one step newer and one step older than `page` in the
-/// blog feed. Returns `(None, None)` for non-blog pages.
-///
-/// `Site::blog` is sorted newest-first, so the newer neighbour is at
-/// index `i - 1` and the older at `i + 1`.
-fn blog_neighbours(page: &PageAny<'_>, site: &Site) -> (Option<PostEntry>, Option<PostEntry>) {
-    if page.kind() != PageKind::Blog {
-        return (None, None);
+/// Template context for a single blog post.
+#[derive(Debug, Serialize)]
+pub struct BlogPostContext {
+    #[serde(flatten)]
+    pub base: StandalonePageContext,
+    pub author: String,
+    pub image: Option<String>,
+    pub description: Option<String>,
+    pub created: String,
+    pub updated: Option<String>,
+    pub tags: Vec<TagRef>,
+    /// Adjacent post one step newer than this one in the blog feed.
+    /// `None` on the newest blog post.
+    pub newer_post: Option<PostEntry>,
+    /// Adjacent post one step older than this one in the blog feed.
+    /// `None` on the oldest blog post.
+    pub older_post: Option<PostEntry>,
+}
+
+impl BlogPostContext {
+    pub fn from_page(
+        page: &Page<BlogFrontmatter>,
+        rendered: &Rendered,
+        site: &Site,
+        site_ctx: &SiteContext,
+    ) -> Self {
+        let (newer, older) = site.blog_neighbours_of(page);
+        let base = StandalonePageContext {
+            site: site_ctx.clone(),
+            title: page.frontmatter.title.clone(),
+            url: page.url_path(),
+            content: rendered.html.clone(),
+            toc: TocEntry::from_headings(&rendered.toc),
+            contains_mermaid: rendered.contains_mermaid,
+        };
+        Self {
+            base,
+            author: page.frontmatter.author.clone(),
+            image: page.frontmatter.image.clone(),
+            description: page.frontmatter.description.clone(),
+            created: page.frontmatter.created.to_string(),
+            updated: page.frontmatter.updated.map(|d| d.to_string()),
+            tags: TagRef::from_tags(&page.frontmatter.tags),
+            newer_post: newer.map(PostEntry::from_blog_page),
+            older_post: older.map(PostEntry::from_blog_page),
+        }
     }
-    let Some(idx) = site.blog.iter().position(|p| &p.slug == page.slug()) else {
-        return (None, None);
-    };
-    let newer = idx
-        .checked_sub(1)
-        .and_then(|i| site.blog.get(i))
-        .map(|p| PostEntry::from_page(&PageAny::Blog(p)));
-    let older = site
-        .blog
-        .get(idx + 1)
-        .map(|p| PostEntry::from_page(&PageAny::Blog(p)));
-    (newer, older)
 }
 
 #[cfg(test)]
@@ -503,12 +538,13 @@ mod tests {
     use crate::content::page::Page;
 
     fn wiki_page(slug: &str, category: Option<&str>) -> Page<WikiFrontmatter> {
+        let slug: Slug = slug.into();
         Page {
-            slug: slug.into(),
+            slug: slug.clone(),
             body: String::new(),
             path: PathBuf::from(format!("content/wiki/{slug}.md")),
             frontmatter: WikiFrontmatter {
-                title: None,
+                title: slug.to_title(),
                 category: category.map(Into::into),
                 created: None,
                 updated: None,
@@ -525,29 +561,53 @@ mod tests {
     }
 
     #[test]
-    fn wiki_categories_ordered_by_config_then_alphabetical_then_none() {
+    fn wiki_categories_ordered_by_config_then_alphabetical_then_default() {
         let site = site_with_wiki(
             &["Getting Started", "Content"],
             vec![
                 wiki_page("alpha", Some("Development")),   // unlisted-named
                 wiki_page("beta", Some("Content")),        // listed second
-                wiki_page("gamma", None),                  // uncategorised
+                wiki_page("gamma", None),                  // default-bucket
                 wiki_page("delta", Some("Customization")), // unlisted-named
                 wiki_page("epsilon", Some("Getting Started")), // listed first
             ],
         );
         let cats = WikiCategory::from_site(&site);
-        let names: Vec<_> = cats.iter().map(|c| c.name.as_deref()).collect();
+        let names: Vec<_> = cats.iter().map(|c| c.name.as_str()).collect();
         assert_eq!(
             names,
             vec![
-                Some("Getting Started"),
-                Some("Content"),
-                Some("Customization"),
-                Some("Development"),
-                None,
+                "Getting Started",
+                "Content",
+                "Customization",
+                "Development",
+                "Other", // default name for the catch-all
             ]
         );
+    }
+
+    #[test]
+    fn wiki_categories_default_to_alphabetical_when_config_empty() {
+        let site = site_with_wiki(
+            &[],
+            vec![
+                wiki_page("a", Some("Zeta")),
+                wiki_page("b", Some("Alpha")),
+                wiki_page("c", None),
+            ],
+        );
+        let cats = WikiCategory::from_site(&site);
+        let names: Vec<_> = cats.iter().map(|c| c.name.as_str()).collect();
+        assert_eq!(names, vec!["Alpha", "Zeta", "Other"]);
+    }
+
+    #[test]
+    fn wiki_default_category_is_configurable() {
+        let mut config: Config = "title = \"T\"\nbase_url = \"http://x\"".parse().unwrap();
+        config.wiki_default_category = "Misc".into();
+        let site = Site::from_parts(config, vec![], vec![wiki_page("a", None)], vec![]).unwrap();
+        let cats = WikiCategory::from_site(&site);
+        assert_eq!(cats[0].name, "Misc");
     }
 
     #[test]
@@ -616,17 +676,16 @@ mod tests {
             blog_post_for_test("b", 2),
             blog_post_for_test("c", 3),
         ]);
-        let middle = PageAny::Blog(site.blog.iter().find(|p| p.slug.as_ref() == "b").unwrap());
-        let (newer, older) = blog_neighbours(&middle, &site);
-        assert_eq!(newer.unwrap().title, "Post c");
-        assert_eq!(older.unwrap().title, "Post a");
+        let middle = site.blog.iter().find(|p| p.slug.as_ref() == "b").unwrap();
+        let (newer, older) = site.blog_neighbours_of(middle);
+        assert_eq!(newer.unwrap().frontmatter.title, "Post c");
+        assert_eq!(older.unwrap().frontmatter.title, "Post a");
     }
 
     #[test]
     fn blog_neighbours_newest_has_no_newer() {
         let site = site_with_blog(vec![blog_post_for_test("a", 1), blog_post_for_test("b", 2)]);
-        let newest = PageAny::Blog(&site.blog[0]);
-        let (newer, older) = blog_neighbours(&newest, &site);
+        let (newer, older) = site.blog_neighbours_of(&site.blog[0]);
         assert!(newer.is_none());
         assert!(older.is_some());
     }
@@ -634,8 +693,7 @@ mod tests {
     #[test]
     fn blog_neighbours_oldest_has_no_older() {
         let site = site_with_blog(vec![blog_post_for_test("a", 1), blog_post_for_test("b", 2)]);
-        let oldest = PageAny::Blog(&site.blog[1]);
-        let (newer, older) = blog_neighbours(&oldest, &site);
+        let (newer, older) = site.blog_neighbours_of(&site.blog[1]);
         assert!(newer.is_some());
         assert!(older.is_none());
     }
@@ -643,18 +701,7 @@ mod tests {
     #[test]
     fn blog_neighbours_single_post_has_no_neighbours() {
         let site = site_with_blog(vec![blog_post_for_test("only", 1)]);
-        let only = PageAny::Blog(&site.blog[0]);
-        let (newer, older) = blog_neighbours(&only, &site);
-        assert!(newer.is_none());
-        assert!(older.is_none());
-    }
-
-    #[test]
-    fn blog_neighbours_returns_none_for_wiki_page() {
-        let site = site_with_blog(vec![blog_post_for_test("a", 1)]);
-        let wiki = wiki_page("w", None);
-        let any = PageAny::Wiki(&wiki);
-        let (newer, older) = blog_neighbours(&any, &site);
+        let (newer, older) = site.blog_neighbours_of(&site.blog[0]);
         assert!(newer.is_none());
         assert!(older.is_none());
     }
@@ -665,20 +712,5 @@ mod tests {
         assert_eq!(p.next_url.as_deref(), Some("/tags/rust/page/2/"));
         let urls: Vec<_> = p.pages.iter().map(|l| l.url.as_str()).collect();
         assert_eq!(urls, vec!["/tags/rust/", "/tags/rust/page/2/"]);
-    }
-
-    #[test]
-    fn wiki_categories_default_to_alphabetical_when_config_empty() {
-        let site = site_with_wiki(
-            &[],
-            vec![
-                wiki_page("a", Some("Zeta")),
-                wiki_page("b", Some("Alpha")),
-                wiki_page("c", None),
-            ],
-        );
-        let cats = WikiCategory::from_site(&site);
-        let names: Vec<_> = cats.iter().map(|c| c.name.as_deref()).collect();
-        assert_eq!(names, vec![Some("Alpha"), Some("Zeta"), None]);
     }
 }
