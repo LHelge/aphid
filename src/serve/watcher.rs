@@ -87,9 +87,10 @@ impl ContentWatcher {
 
                     tracing::info!("file change detected, rebuilding…");
                     let start = Instant::now();
-                    match rebuilder.next_rendered() {
-                        Ok(rendered) => {
-                            state.swap(rendered).await;
+                    match rebuilder.next_built() {
+                        Ok(built) => {
+                            super::server::log_diagnostics(&built);
+                            state.swap(built).await;
                             tracing::info!(
                                 "rebuild complete in {}ms",
                                 start.elapsed().as_millis()

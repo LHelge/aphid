@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
+use crate::markdown::BrokenWikiLink;
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("I/O error: {0}")]
@@ -35,7 +37,7 @@ pub enum Error {
     #[error("template render error: {0}")]
     Tera(#[from] tera::Error),
     #[error("broken wiki-links found:\n{}", format_broken_links(.0))]
-    BrokenWikiLinks(Vec<(String, String)>),
+    BrokenWikiLinks(Vec<BrokenWikiLink>),
     #[error("file watcher error: {0}")]
     Notify(#[from] notify::Error),
     #[error("refusing unsafe path '{}': {reason}", path.display())]
@@ -53,11 +55,14 @@ pub enum Error {
     Favicon { path: PathBuf, reason: String },
 }
 
-fn format_broken_links(links: &[(String, String)]) -> String {
+fn format_broken_links(links: &[BrokenWikiLink]) -> String {
     links
         .iter()
-        .map(|(page, target)| {
-            format!("  - page \"{page}\" references missing wiki-link: \"{target}\"")
+        .map(|link| {
+            format!(
+                "  - page \"{}\" references missing wiki-link: \"{}\"",
+                link.source, link.target
+            )
         })
         .collect::<Vec<_>>()
         .join("\n")

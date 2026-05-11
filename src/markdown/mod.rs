@@ -3,6 +3,7 @@ pub mod anchors;
 pub mod external_links;
 pub mod highlight;
 pub mod relative_urls;
+pub mod rendered;
 pub mod wikilinks;
 
 pub use alerts::rewrite_alerts;
@@ -10,7 +11,10 @@ pub use anchors::{HeadingEntry, inject_heading_ids};
 pub use external_links::rewrite_external_links;
 pub use highlight::Highlighter;
 pub use relative_urls::rewrite_relative_urls;
+pub use rendered::{BrokenWikiLink, DiagnosticSource, Diagnostics, RenderedSite};
 pub use wikilinks::{WikiLinkRef, extract_wiki_links, rewrite_wiki_links};
+
+use rayon::prelude::*;
 
 use pulldown_cmark::{Options, Parser, html};
 
@@ -85,6 +89,41 @@ impl<'a> MarkdownRenderer<'a> {
             broken_wiki_links,
             contains_mermaid,
         }
+    }
+
+    /// Render every page body in the site through the markdown pipeline and
+    /// return them joined to their source pages. Blog and wiki are walked in
+    /// parallel via rayon (`par_iter` within each); standalone pages and
+    /// `home.md` stay on the current thread because they're typically a
+    /// handful of files and the parallelism overhead isn't worth it.
+    pub fn render_site(&self) -> RenderedSite<'a> {
+        let (blog, wiki) = rayon::join(
+            || {
+                self.site
+                    .blog
+                    .par_iter()
+                    .map(|p| (p, self.render(&p.body)))
+                    .collect::<Vec<_>>()
+            },
+            || {
+                self.site
+                    .wiki
+                    .par_iter()
+                    .map(|p| (p, self.render(&p.body)))
+                    .collect::<Vec<_>>()
+            },
+        );
+
+        let pages: Vec<_> = self
+            .site
+            .pages
+            .iter()
+            .map(|p| (p, self.render(&p.body)))
+            .collect();
+
+        let home = self.site.home.as_ref().map(|h| (h, self.render(&h.body)));
+
+        RenderedSite::from_parts(self.site, blog, wiki, pages, home)
     }
 }
 

@@ -4,13 +4,13 @@ use std::time::SystemTime;
 use crate::Error;
 use crate::config::Config;
 use crate::generated::FaviconSet;
-use crate::render::{Mode, RenderedSite, Theme};
+use crate::render::{BuiltSite, Theme};
 
 /// Owns the per-rebuild state of `aphid serve`: the path to `aphid.toml`
 /// and the cached favicon set keyed by its source path and mtime.
 ///
 /// Held by the file watcher across rebuilds; the watcher calls
-/// [`Rebuilder::next_rendered`] on every change. The favicon-source check
+/// [`Rebuilder::next_built`] on every change. The favicon-source check
 /// is a fast `stat()`; the expensive regeneration only runs when the
 /// source path or its mtime actually changed.
 pub(crate) struct Rebuilder {
@@ -26,7 +26,7 @@ struct FaviconCacheEntry {
 
 impl Rebuilder {
     /// Construct with no cached favicon. The first call to
-    /// [`next_rendered`](Self::next_rendered) generates one if config has
+    /// [`next_built`](Self::next_built) generates one if config has
     /// a favicon source.
     #[cfg(test)]
     pub(crate) fn new(config_path: PathBuf) -> Self {
@@ -61,13 +61,14 @@ impl Rebuilder {
     }
 
     /// Reload config + theme, refresh the favicon if its source changed,
-    /// and re-render the site. Returns the freshly rendered site; the
-    /// caller is responsible for swapping it into shared state.
-    pub(crate) fn next_rendered(&mut self) -> Result<RenderedSite, Error> {
+    /// and re-render the site. Returns the freshly built site; the
+    /// caller is responsible for logging any diagnostics and swapping
+    /// it into shared state.
+    pub(crate) fn next_built(&mut self) -> Result<BuiltSite, Error> {
         let config = Config::from_path(&self.config_path)?;
         let theme = Theme::load(&config)?;
         let favicon = self.refresh_favicon(&config)?;
-        RenderedSite::build_with_favicon(&config, &theme, Mode::Serve, favicon)
+        BuiltSite::build_with_favicon(&config, &theme, favicon)
     }
 
     /// Return the cached favicon, regenerating it if and only if the
@@ -141,12 +142,12 @@ mod tests {
         let mut rebuilder = Rebuilder::new(dir.path().join("aphid.toml"));
 
         // First call: generates and caches.
-        rebuilder.next_rendered().unwrap();
+        rebuilder.next_built().unwrap();
         let mtime_after_first = rebuilder.cached_favicon_mtime().unwrap();
 
         // Second call without touching the file: cached mtime stays exactly
         // equal — no regeneration.
-        rebuilder.next_rendered().unwrap();
+        rebuilder.next_built().unwrap();
         assert_eq!(rebuilder.cached_favicon_mtime().unwrap(), mtime_after_first);
     }
 
@@ -156,7 +157,7 @@ mod tests {
         write_minimal_site(dir.path(), "favicon.png");
 
         let mut rebuilder = Rebuilder::new(dir.path().join("aphid.toml"));
-        rebuilder.next_rendered().unwrap();
+        rebuilder.next_built().unwrap();
         let first_mtime = rebuilder.cached_favicon_mtime().unwrap();
 
         // Bump mtime forward — set explicitly so the test isn't sensitive
@@ -167,7 +168,7 @@ mod tests {
         f.set_modified(later).unwrap();
         drop(f);
 
-        rebuilder.next_rendered().unwrap();
+        rebuilder.next_built().unwrap();
         assert_eq!(rebuilder.cached_favicon_mtime().unwrap(), later);
     }
 
@@ -177,7 +178,7 @@ mod tests {
         write_minimal_site(dir.path(), "favicon.png");
 
         let mut rebuilder = Rebuilder::new(dir.path().join("aphid.toml"));
-        rebuilder.next_rendered().unwrap();
+        rebuilder.next_built().unwrap();
         assert!(rebuilder.cached_favicon_mtime().is_some());
 
         // Rewrite config without favicon field.
@@ -186,7 +187,7 @@ mod tests {
             "title = \"T\"\nbase_url = \"http://localhost\"\n",
         );
 
-        rebuilder.next_rendered().unwrap();
+        rebuilder.next_built().unwrap();
         assert!(rebuilder.cached_favicon_mtime().is_none());
     }
 }

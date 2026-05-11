@@ -1,6 +1,6 @@
 use tokio::sync::{Notify, RwLock, broadcast};
 
-use crate::render::RenderedSite;
+use crate::render::BuiltSite;
 
 /// Shared state for the axum application: the current rendered site,
 /// the live-reload broadcast channel, and the shutdown notifier.
@@ -10,7 +10,7 @@ use crate::render::RenderedSite;
 /// live-reload need to read.
 #[doc(hidden)]
 pub struct AppState {
-    pub(crate) site: RwLock<RenderedSite>,
+    pub(crate) site: RwLock<BuiltSite>,
     /// Broadcast channel for signalling browsers to reload.
     pub reload_tx: broadcast::Sender<()>,
     /// Notified on shutdown so WebSocket handlers and the file watcher can
@@ -20,7 +20,7 @@ pub struct AppState {
 
 impl AppState {
     /// Wrap a freshly rendered site with the broadcast and shutdown channels.
-    pub(super) fn new(rendered: RenderedSite) -> Self {
+    pub(super) fn new(rendered: BuiltSite) -> Self {
         let (reload_tx, _) = broadcast::channel(16);
         Self {
             site: RwLock::new(rendered),
@@ -32,7 +32,7 @@ impl AppState {
     /// Atomically replace the rendered site and notify connected browsers
     /// to reload. The render itself happens elsewhere — this is the
     /// state-mutation half of a rebuild.
-    pub(crate) async fn swap(&self, rendered: RenderedSite) {
+    pub(crate) async fn swap(&self, rendered: BuiltSite) {
         *self.site.write().await = rendered;
         let _ = self.reload_tx.send(());
     }
@@ -43,21 +43,23 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
-    fn empty_rendered() -> RenderedSite {
-        RenderedSite {
+    fn empty_rendered() -> BuiltSite {
+        BuiltSite {
             pages: HashMap::new(),
             not_found_html: String::new(),
             root_files: Vec::new(),
+            diagnostics: Default::default(),
         }
     }
 
-    fn rendered_with_page(url: &str, html: &str) -> RenderedSite {
+    fn rendered_with_page(url: &str, html: &str) -> BuiltSite {
         let mut pages = HashMap::new();
         pages.insert(url.to_string(), html.to_string());
-        RenderedSite {
+        BuiltSite {
             pages,
             not_found_html: String::new(),
             root_files: Vec::new(),
+            diagnostics: Default::default(),
         }
     }
 

@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::Error;
-use crate::render::{RenderedSite, Theme};
+use crate::render::{BuiltSite, Theme};
 
 /// Recursively copy all files from `src` into `dest`, preserving directory
 /// structure. Skips hidden files (dotfiles). Creates parent dirs as needed.
@@ -54,14 +54,9 @@ impl OutputWriter {
         Ok(Self { dir })
     }
 
-    /// Write a fully rendered site to disk: every page, the 404 page, and
+    /// Write a fully built site to disk: every page, the 404 page, and
     /// theme + user static files.
-    pub fn write(
-        &self,
-        site: &RenderedSite,
-        theme: &Theme,
-        user_static: &Path,
-    ) -> Result<(), Error> {
+    pub fn write(&self, site: &BuiltSite, theme: &Theme, user_static: &Path) -> Result<(), Error> {
         for (url_path, html) in &site.pages {
             self.write_page(url_path, html)?;
         }

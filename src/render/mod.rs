@@ -12,24 +12,17 @@ use tera::Context;
 
 use crate::Error;
 use crate::config::Config;
-use crate::content::{PageView, Site, Slug};
+use crate::content::{PageView, Site};
 use crate::generated::{AtomFeed, FaviconSet, Robots, RssFeed, Sitemap};
-use crate::markdown::{MarkdownRenderer, Rendered};
+use crate::markdown::{Diagnostics, MarkdownRenderer, RenderedSite};
 
-/// Controls mode-specific behaviour during rendering.
+/// A fully built site, ready to be written to disk or served over HTTP.
 ///
-/// In **build** mode broken wiki-links are fatal errors and RSS/Atom feeds
-/// are generated. In **serve** mode broken links are logged as warnings
-/// (so writing can continue) and feed generation is skipped for faster
-/// rebuilds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Mode {
-    Build,
-    Serve,
-}
-
-/// In-memory representation of the rendered site.
-pub struct RenderedSite {
+/// Carries diagnostics from pass 1 (markdown rendering) alongside the
+/// output artifacts. Callers decide what to do with the diagnostics:
+/// [`crate::build`] turns broken wiki-links into an error, the dev server
+/// logs them as warnings and serves the pages anyway.
+pub struct BuiltSite {
     /// URL path -> rendered HTML (e.g. "/blog/hello/" -> "<html>...</html>")
     pub pages: HashMap<String, String>,
     /// Pre-rendered 404 page HTML.
@@ -37,21 +30,19 @@ pub struct RenderedSite {
     /// Files written at the site root (e.g. `favicon.ico`, `robots.txt`,
     /// `sitemap.xml`). Each entry is `(filename, bytes)`.
     pub root_files: Vec<(String, Vec<u8>)>,
+    /// Build-time signals collected during pass 1.
+    pub diagnostics: Diagnostics,
 }
 
-impl RenderedSite {
+impl BuiltSite {
     /// Load content from `config` and render every page against `theme`.
-    ///
-    /// In [`Mode::Build`] broken wiki-links are fatal and feeds are
-    /// generated. In [`Mode::Serve`] broken links are warnings and feeds
-    /// are skipped.
-    pub fn build(config: &Config, theme: &Theme, mode: Mode) -> Result<Self, Error> {
+    pub fn build(config: &Config, theme: &Theme) -> Result<Self, Error> {
         let favicon = config
             .favicon
             .as_ref()
             .map(|p| FaviconSet::generate(p, &config.title))
             .transpose()?;
-        Self::build_with_favicon(config, theme, mode, favicon)
+        Self::build_with_favicon(config, theme, favicon)
     }
 
     /// Like [`build`](Self::build) but accepts a pre-built [`FaviconSet`].
@@ -62,12 +53,13 @@ impl RenderedSite {
     pub fn build_with_favicon(
         config: &Config,
         theme: &Theme,
-        mode: Mode,
         favicon: Option<FaviconSet>,
     ) -> Result<Self, Error> {
         tracing::info!(source = %config.source_dir.display(), "loading content");
         let site = Site::load(config.clone())?;
-        Renderer::new(theme).render_all(&site, config, mode, favicon)
+        tracing::info!("rendering markdown");
+        let rendered = MarkdownRenderer::new(&site).render_site();
+        Renderer::new(theme).render_all(&rendered, config, favicon)
     }
 
     /// Look up rendered HTML for a URL path, normalising trailing slashes.
@@ -80,25 +72,11 @@ impl RenderedSite {
     }
 }
 
-/// Pass-1 output: every page's body rendered to HTML, keyed by slug.
-/// `home` is kept separate because `home.md` has no slug.
-struct RenderedPages {
-    pages: HashMap<Slug, Rendered>,
-    home: Option<Rendered>,
-}
-
-impl RenderedPages {
-    fn get(&self, slug: &Slug) -> &Rendered {
-        self.pages
-            .get(slug)
-            .expect("pass 1 renders every non-draft page")
-    }
-}
-
-/// Pass-2 orchestrator: takes a [`Site`] and a [`Theme`] and produces a
-/// fully-rendered [`RenderedSite`]. Internally runs the markdown pipeline
-/// per page (in parallel via rayon), then per-page Tera template
-/// rendering, then the index/tag/404 pages.
+/// Pass-2 orchestrator: takes a [`RenderedSite`] (markdown bodies already
+/// rendered, joined to their pages) and a [`Theme`], and produces a
+/// fully-built [`BuiltSite`]. Runs per-page Tera template rendering in
+/// parallel via rayon, then the index/tag/404 pages, then assembles the
+/// root files.
 pub struct Renderer<'a> {
     theme: &'a Theme,
 }
@@ -108,30 +86,29 @@ impl<'a> Renderer<'a> {
         Self { theme }
     }
 
-    /// Render the entire site: markdown pass, broken-link policy, template rendering.
+    /// Apply templates and assemble root files. Pass 1 is already done — the
+    /// [`RenderedSite`] argument carries the markdown bodies and any
+    /// diagnostics; this method neither extends nor inspects the
+    /// diagnostics, just forwards them onto the [`BuiltSite`].
     fn render_all(
         &self,
-        site: &Site,
+        rendered: &RenderedSite<'_>,
         config: &Config,
-        mode: Mode,
         favicon: Option<FaviconSet>,
-    ) -> Result<RenderedSite, Error> {
-        tracing::info!("rendering markdown");
-        let rendered = Self::render_markdown(site);
-        Self::check_broken_links(&rendered, mode)?;
-
+    ) -> Result<BuiltSite, Error> {
+        let site = rendered.site();
         let site_ctx = SiteContext::from_config(&site.config, &site.pages, favicon.as_ref());
         let wiki_categories = WikiCategory::from_site(site);
 
         let (blog_html, wiki_html) = rayon::join(
-            || self.render_blog_pages(site, &rendered, &site_ctx),
-            || self.render_wiki_pages(site, &rendered, &site_ctx, &wiki_categories),
+            || self.render_blog_pages(rendered, &site_ctx),
+            || self.render_wiki_pages(rendered, &site_ctx, &wiki_categories),
         );
         let mut pages = blog_html?;
         pages.extend(wiki_html?);
-        pages.extend(self.render_standalone_pages(site, &rendered, &site_ctx)?);
+        pages.extend(self.render_standalone_pages(rendered, &site_ctx)?);
         pages.extend(self.render_tag_pages(site, &site_ctx)?);
-        pages.extend(self.render_index_pages(site, &rendered, &site_ctx, &wiki_categories)?);
+        pages.extend(self.render_index_pages(rendered, &site_ctx, &wiki_categories)?);
 
         let not_found_html =
             self.render_template("404.html", &NotFoundContext { site: site_ctx })?;
@@ -148,98 +125,27 @@ impl<'a> Renderer<'a> {
             Robots::new(config.normalized_base_url()).into_bytes(),
         ));
         root_files.push(("sitemap.xml".into(), Sitemap::new(site).into_bytes()));
-        root_files.push((
-            "feed.xml".into(),
-            AtomFeed::new(site, &rendered.pages).into_bytes(),
-        ));
-        root_files.push((
-            "rss.xml".into(),
-            RssFeed::new(site, &rendered.pages).into_bytes(),
-        ));
+        root_files.push(("feed.xml".into(), AtomFeed::new(rendered).into_bytes()));
+        root_files.push(("rss.xml".into(), RssFeed::new(rendered).into_bytes()));
 
-        Ok(RenderedSite {
+        Ok(BuiltSite {
             pages,
             not_found_html,
             root_files,
+            diagnostics: rendered.diagnostics().clone(),
         })
-    }
-
-    fn render_markdown(site: &Site) -> RenderedPages {
-        let md = MarkdownRenderer::new(site);
-
-        // Blog and wiki are the bulk of pages; render them concurrently
-        // through `rayon::join`, with `par_iter` parallelising across pages
-        // within each. Standalone pages and home.md are typically a handful
-        // — the par_iter overhead isn't worth it for them, so they stay on
-        // the current thread.
-        let (blog_rendered, wiki_rendered) = rayon::join(
-            || {
-                site.blog
-                    .par_iter()
-                    .map(|p| (p.slug.clone(), md.render(&p.body)))
-                    .collect::<Vec<_>>()
-            },
-            || {
-                site.wiki
-                    .par_iter()
-                    .map(|p| (p.slug.clone(), md.render(&p.body)))
-                    .collect::<Vec<_>>()
-            },
-        );
-
-        let standalone_rendered: Vec<(Slug, Rendered)> = site
-            .pages
-            .iter()
-            .map(|p| (p.slug.clone(), md.render(&p.body)))
-            .collect();
-
-        let pages: HashMap<Slug, Rendered> = blog_rendered
-            .into_iter()
-            .chain(wiki_rendered)
-            .chain(standalone_rendered)
-            .collect();
-
-        let home = site.home.as_ref().map(|page| md.render(&page.body));
-
-        RenderedPages { pages, home }
-    }
-
-    fn check_broken_links(rendered: &RenderedPages, mode: Mode) -> Result<(), Error> {
-        let page_broken = rendered.pages.iter().flat_map(|(slug, r)| {
-            r.broken_wiki_links
-                .iter()
-                .map(move |target| (slug.to_string(), target.clone()))
-        });
-        let home_broken = rendered
-            .home
-            .iter()
-            .flat_map(|r| r.broken_wiki_links.iter())
-            .map(|target| ("home.md".to_string(), target.clone()));
-        let all_broken = page_broken.chain(home_broken);
-
-        if mode == Mode::Build {
-            let broken: Vec<(String, String)> = all_broken.collect();
-            if !broken.is_empty() {
-                return Err(Error::BrokenWikiLinks(broken));
-            }
-        } else {
-            for (slug, target) in all_broken {
-                tracing::warn!(page = slug, target, "broken wiki-link");
-            }
-        }
-        Ok(())
     }
 
     fn render_blog_pages(
         &self,
-        site: &Site,
-        rendered: &RenderedPages,
+        rendered: &RenderedSite<'_>,
         site_ctx: &SiteContext,
     ) -> Result<HashMap<String, String>, Error> {
-        site.blog
-            .par_iter()
-            .map(|page| {
-                let r = rendered.get(&page.slug);
+        let site = rendered.site();
+        rendered
+            .blog()
+            .par_bridge()
+            .map(|(page, r)| {
                 let ctx = BlogPostContext::from_page(page, r, site, site_ctx);
                 let url = page.url_path();
                 let html = self.render_template("blog_post.html", &ctx)?;
@@ -250,15 +156,15 @@ impl<'a> Renderer<'a> {
 
     fn render_wiki_pages(
         &self,
-        site: &Site,
-        rendered: &RenderedPages,
+        rendered: &RenderedSite<'_>,
         site_ctx: &SiteContext,
         wiki_categories: &[WikiCategory],
     ) -> Result<HashMap<String, String>, Error> {
-        site.wiki
-            .par_iter()
-            .map(|page| {
-                let r = rendered.get(&page.slug);
+        let site = rendered.site();
+        rendered
+            .wiki()
+            .par_bridge()
+            .map(|(page, r)| {
                 let ctx =
                     WikiPageContext::from_page(page, r, site, site_ctx, wiki_categories.to_vec());
                 let url = page.url_path();
@@ -270,14 +176,13 @@ impl<'a> Renderer<'a> {
 
     fn render_standalone_pages(
         &self,
-        site: &Site,
-        rendered: &RenderedPages,
+        rendered: &RenderedSite<'_>,
         site_ctx: &SiteContext,
     ) -> Result<HashMap<String, String>, Error> {
-        site.pages
-            .par_iter()
-            .map(|page| {
-                let r = rendered.get(&page.slug);
+        rendered
+            .pages()
+            .par_bridge()
+            .map(|(page, r)| {
                 let ctx = StandalonePageContext::from_page(page, r, site_ctx);
                 let url = page.url_path();
                 let html = self.render_template("page.html", &ctx)?;
@@ -345,17 +250,17 @@ impl<'a> Renderer<'a> {
 
     fn render_index_pages(
         &self,
-        site: &Site,
-        rendered: &RenderedPages,
+        rendered: &RenderedSite<'_>,
         site_ctx: &SiteContext,
         wiki_categories: &[WikiCategory],
     ) -> Result<HashMap<String, String>, Error> {
+        let site = rendered.site();
         let mut pages = HashMap::new();
 
         let posts = PostEntry::from_blog_pages(&site.blog);
         let per_page = site.config.posts_per_page.max(1);
 
-        let home_rendered = site.home.as_ref().and(rendered.home.as_ref());
+        let home_rendered = rendered.home().map(|(_, r)| r);
         let home_content = home_rendered.map(HomeContent::from);
         let contains_mermaid = home_rendered.is_some_and(|r| r.contains_mermaid);
         let home_ctx = HomeContext {
@@ -509,9 +414,9 @@ mod tests {
 
         let theme = theme_with_stub_blog_index();
         let renderer = Renderer::new(&theme);
-        let rendered = Renderer::render_markdown(&site);
+        let rendered = MarkdownRenderer::new(&site).render_site();
         let pages = renderer
-            .render_index_pages(&site, &rendered, &site_ctx_for_test(), &[])
+            .render_index_pages(&rendered, &site_ctx_for_test(), &[])
             .unwrap();
 
         assert!(pages.contains_key("/blog/"));
@@ -538,9 +443,9 @@ mod tests {
 
         let theme = theme_with_stub_blog_index();
         let renderer = Renderer::new(&theme);
-        let rendered = Renderer::render_markdown(&site);
+        let rendered = MarkdownRenderer::new(&site).render_site();
         let pages = renderer
-            .render_index_pages(&site, &rendered, &site_ctx_for_test(), &[])
+            .render_index_pages(&rendered, &site_ctx_for_test(), &[])
             .unwrap();
 
         assert!(pages.contains_key("/blog/"));

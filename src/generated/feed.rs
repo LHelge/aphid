@@ -7,7 +7,7 @@ use quick_xml::events::{BytesDecl, BytesText};
 use crate::content::Site;
 use crate::content::frontmatter::BlogFrontmatter;
 use crate::content::page::{Page, PageKind};
-use crate::markdown::Rendered;
+use crate::markdown::{Rendered, RenderedSite};
 
 use regex::Regex;
 use std::sync::LazyLock;
@@ -37,18 +37,13 @@ fn rfc2822(date: NaiveDate) -> String {
 }
 
 /// Collect the blog entries that should appear in the feed, pairing each
-/// post with its rendered HTML body looked up by slug. Posts whose body
-/// is missing from `rendered` are silently skipped (this should not
-/// happen in practice — pass 1 covers every non-draft page).
+/// post with its rendered HTML body. The pairing comes straight from the
+/// [`RenderedSite`] — no lookup, no chance of a slug miss.
 fn feed_entries<'a>(
-    site: &'a Site,
-    rendered: &'a std::collections::HashMap<crate::content::Slug, Rendered>,
+    rendered: &'a RenderedSite<'_>,
 ) -> Vec<(&'a Page<BlogFrontmatter>, &'a Rendered)> {
-    let limit = site.config.feed_limit;
-    let iter = site
-        .blog
-        .iter()
-        .filter_map(|p| rendered.get(&p.slug).map(|r| (p, r)));
+    let limit = rendered.site().config.feed_limit;
+    let iter = rendered.blog();
     if limit == 0 {
         iter.collect()
     } else {
@@ -62,14 +57,11 @@ pub struct AtomFeed {
 }
 
 impl AtomFeed {
-    pub fn new(
-        site: &Site,
-        rendered: &std::collections::HashMap<crate::content::Slug, Rendered>,
-    ) -> Self {
+    pub fn new(rendered: &RenderedSite<'_>) -> Self {
         tracing::debug!("generating feed.xml (Atom)");
-        let entries = feed_entries(site, rendered);
+        let entries = feed_entries(rendered);
         Self {
-            bytes: Self::render(site, &entries),
+            bytes: Self::render(rendered.site(), &entries),
         }
     }
 
@@ -193,14 +185,11 @@ pub struct RssFeed {
 }
 
 impl RssFeed {
-    pub fn new(
-        site: &Site,
-        rendered: &std::collections::HashMap<crate::content::Slug, Rendered>,
-    ) -> Self {
+    pub fn new(rendered: &RenderedSite<'_>) -> Self {
         tracing::debug!("generating rss.xml (RSS 2.0)");
-        let entries = feed_entries(site, rendered);
+        let entries = feed_entries(rendered);
         Self {
-            bytes: Self::render(site, &entries),
+            bytes: Self::render(rendered.site(), &entries),
         }
     }
 
@@ -319,6 +308,26 @@ mod tests {
             .collect()
     }
 
+    /// Build a `RenderedSite` for the feed tests by joining `site.blog`
+    /// against a slug-keyed rendered map. Posts without an entry are paired
+    /// with an empty `Rendered` so iteration order matches `site.blog`.
+    fn rendered_site<'a>(
+        site: &'a Site,
+        mut rendered: HashMap<Slug, Rendered>,
+    ) -> RenderedSite<'a> {
+        let blog: Vec<_> = site
+            .blog
+            .iter()
+            .map(|p| {
+                let r = rendered
+                    .remove(&p.slug)
+                    .unwrap_or_else(|| rendered_html(""));
+                (p, r)
+            })
+            .collect();
+        RenderedSite::from_parts(site, blog, vec![], vec![], None)
+    }
+
     fn test_config() -> crate::config::Config {
         "title = \"Test Blog\"\nbase_url = \"https://example.com\"\ndescription = \"A test blog\""
             .parse()
@@ -361,7 +370,8 @@ mod tests {
     #[test]
     fn atom_well_formed() {
         let site = Site::from_parts(test_config(), vec![], vec![], vec![]).unwrap();
-        let xml = String::from_utf8(AtomFeed::new(&site, &HashMap::new()).into_bytes()).unwrap();
+        let rendered = rendered_site(&site, HashMap::new());
+        let xml = String::from_utf8(AtomFeed::new(&rendered).into_bytes()).unwrap();
 
         assert!(xml.starts_with("<?xml"));
         assert!(xml.contains("<feed xmlns=\"http://www.w3.org/2005/Atom\">"));
@@ -373,7 +383,8 @@ mod tests {
     #[test]
     fn rss_well_formed() {
         let site = Site::from_parts(test_config(), vec![], vec![], vec![]).unwrap();
-        let xml = String::from_utf8(RssFeed::new(&site, &HashMap::new()).into_bytes()).unwrap();
+        let rendered = rendered_site(&site, HashMap::new());
+        let xml = String::from_utf8(RssFeed::new(&rendered).into_bytes()).unwrap();
 
         assert!(xml.starts_with("<?xml"));
         assert!(xml.contains("<rss version=\"2.0\""));
@@ -391,9 +402,12 @@ mod tests {
             NaiveDate::from_ymd_opt(2026, 4, 20).unwrap(),
             vec!["rust"],
         )];
-        let rendered = rendered_map(vec![("hello", rendered_html("<p>Hello, world!</p>"))]);
         let site = Site::from_parts(test_config(), blog, vec![], vec![]).unwrap();
-        let xml = String::from_utf8(AtomFeed::new(&site, &rendered).into_bytes()).unwrap();
+        let rendered = rendered_site(
+            &site,
+            rendered_map(vec![("hello", rendered_html("<p>Hello, world!</p>"))]),
+        );
+        let xml = String::from_utf8(AtomFeed::new(&rendered).into_bytes()).unwrap();
 
         assert!(xml.contains("<title>Hello World</title>"));
         assert!(xml.contains("https://example.com/blog/hello/"));
@@ -412,9 +426,12 @@ mod tests {
             NaiveDate::from_ymd_opt(2026, 4, 20).unwrap(),
             vec!["rust"],
         )];
-        let rendered = rendered_map(vec![("hello", rendered_html("<p>Hello, world!</p>"))]);
         let site = Site::from_parts(test_config(), blog, vec![], vec![]).unwrap();
-        let xml = String::from_utf8(RssFeed::new(&site, &rendered).into_bytes()).unwrap();
+        let rendered = rendered_site(
+            &site,
+            rendered_map(vec![("hello", rendered_html("<p>Hello, world!</p>"))]),
+        );
+        let xml = String::from_utf8(RssFeed::new(&rendered).into_bytes()).unwrap();
 
         assert!(xml.contains("<title>Hello World</title>"));
         assert!(xml.contains("<link>https://example.com/blog/hello/</link>"));
@@ -442,17 +459,20 @@ mod tests {
                 vec![],
             ),
         ];
-        let rendered = rendered_map(vec![
-            ("a", rendered_html("<p>A</p>")),
-            ("b", rendered_html("<p>B</p>")),
-        ]);
         let site = Site::from_parts(config, blog, vec![], vec![]).unwrap();
+        let rendered = rendered_site(
+            &site,
+            rendered_map(vec![
+                ("a", rendered_html("<p>A</p>")),
+                ("b", rendered_html("<p>B</p>")),
+            ]),
+        );
 
-        let atom = String::from_utf8(AtomFeed::new(&site, &rendered).into_bytes()).unwrap();
+        let atom = String::from_utf8(AtomFeed::new(&rendered).into_bytes()).unwrap();
         assert!(atom.contains("First"));
         assert!(!atom.contains("Second"));
 
-        let rss = String::from_utf8(RssFeed::new(&site, &rendered).into_bytes()).unwrap();
+        let rss = String::from_utf8(RssFeed::new(&rendered).into_bytes()).unwrap();
         assert!(rss.contains("First"));
         assert!(!rss.contains("Second"));
     }
@@ -475,13 +495,16 @@ mod tests {
                 vec![],
             ),
         ];
-        let rendered = rendered_map(vec![
-            ("a", rendered_html("<p>A</p>")),
-            ("b", rendered_html("<p>B</p>")),
-        ]);
         let site = Site::from_parts(config, blog, vec![], vec![]).unwrap();
+        let rendered = rendered_site(
+            &site,
+            rendered_map(vec![
+                ("a", rendered_html("<p>A</p>")),
+                ("b", rendered_html("<p>B</p>")),
+            ]),
+        );
 
-        let atom = String::from_utf8(AtomFeed::new(&site, &rendered).into_bytes()).unwrap();
+        let atom = String::from_utf8(AtomFeed::new(&rendered).into_bytes()).unwrap();
         assert!(atom.contains("First"));
         assert!(atom.contains("Second"));
     }
@@ -494,13 +517,16 @@ mod tests {
             NaiveDate::from_ymd_opt(2026, 4, 20).unwrap(),
             vec![],
         )];
-        let rendered = rendered_map(vec![("test", rendered_html("<p>x &amp; y</p>"))]);
         let site = Site::from_parts(test_config(), blog, vec![], vec![]).unwrap();
+        let rendered = rendered_site(
+            &site,
+            rendered_map(vec![("test", rendered_html("<p>x &amp; y</p>"))]),
+        );
 
-        let atom = String::from_utf8(AtomFeed::new(&site, &rendered).into_bytes()).unwrap();
+        let atom = String::from_utf8(AtomFeed::new(&rendered).into_bytes()).unwrap();
         assert!(atom.contains("A &amp; B &lt;C&gt;"));
 
-        let rss = String::from_utf8(RssFeed::new(&site, &rendered).into_bytes()).unwrap();
+        let rss = String::from_utf8(RssFeed::new(&rendered).into_bytes()).unwrap();
         assert!(rss.contains("A &amp; B &lt;C&gt;"));
     }
 
@@ -512,21 +538,24 @@ mod tests {
             NaiveDate::from_ymd_opt(2026, 4, 20).unwrap(),
             vec![],
         )];
-        let rendered = rendered_map(vec![(
-            "links",
-            rendered_html(
-                r#"<p><a href="/wiki/foo/">foo</a> and <img src="/static/img.png"/></p>"#,
-            ),
-        )]);
         let site = Site::from_parts(test_config(), blog, vec![], vec![]).unwrap();
+        let rendered = rendered_site(
+            &site,
+            rendered_map(vec![(
+                "links",
+                rendered_html(
+                    r#"<p><a href="/wiki/foo/">foo</a> and <img src="/static/img.png"/></p>"#,
+                ),
+            )]),
+        );
 
-        let atom = String::from_utf8(AtomFeed::new(&site, &rendered).into_bytes()).unwrap();
+        let atom = String::from_utf8(AtomFeed::new(&rendered).into_bytes()).unwrap();
         assert!(atom.contains("https://example.com/wiki/foo/"));
         assert!(atom.contains("https://example.com/static/img.png"));
         assert!(!atom.contains("href=&quot;/wiki/foo/"));
         assert!(!atom.contains("src=&quot;/static/img.png"));
 
-        let rss = String::from_utf8(RssFeed::new(&site, &rendered).into_bytes()).unwrap();
+        let rss = String::from_utf8(RssFeed::new(&rendered).into_bytes()).unwrap();
         assert!(rss.contains("https://example.com/wiki/foo/"));
         assert!(rss.contains("https://example.com/static/img.png"));
     }
