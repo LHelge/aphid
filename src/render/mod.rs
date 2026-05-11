@@ -11,9 +11,10 @@ use serde::Serialize;
 use tera::Context;
 
 use crate::Error;
+use crate::artifacts;
 use crate::config::Config;
 use crate::content::{PageView, Site};
-use crate::generated::{AtomFeed, FaviconSet, Robots, RssFeed, Sitemap};
+use crate::favicon::FaviconSet;
 use crate::markdown::{Diagnostics, MarkdownRenderer, RenderedSite};
 
 /// A fully built site, ready to be written to disk or served over HTTP.
@@ -59,7 +60,7 @@ impl BuiltSite {
         let site = Site::load(config.clone())?;
         tracing::info!("rendering markdown");
         let rendered = MarkdownRenderer::new(&site).render_site();
-        Renderer::new(theme).render_all(&rendered, config, favicon)
+        Renderer::new(theme).render_all(&rendered, favicon)
     }
 
     /// Look up rendered HTML for a URL path, normalising trailing slashes.
@@ -93,7 +94,6 @@ impl<'a> Renderer<'a> {
     fn render_all(
         &self,
         rendered: &RenderedSite<'_>,
-        config: &Config,
         favicon: Option<FaviconSet>,
     ) -> Result<BuiltSite, Error> {
         let site = rendered.site();
@@ -113,20 +113,12 @@ impl<'a> Renderer<'a> {
         let not_found_html =
             self.render_template("404.html", &NotFoundContext { site: site_ctx })?;
 
-        // ── Root files (favicon, robots.txt, sitemap.xml, feeds) ────────
+        // ── Root files (favicon, then every RootArtifact) ───────────────
         let mut root_files: Vec<(String, Vec<u8>)> = Vec::new();
-
         if let Some(set) = favicon {
             root_files.extend(set.files.clone());
         }
-
-        root_files.push((
-            "robots.txt".into(),
-            Robots::new(config.normalized_base_url()).into_bytes(),
-        ));
-        root_files.push(("sitemap.xml".into(), Sitemap::new(site).into_bytes()));
-        root_files.push(("feed.xml".into(), AtomFeed::new(rendered).into_bytes()));
-        root_files.push(("rss.xml".into(), RssFeed::new(rendered).into_bytes()));
+        root_files.extend(artifacts::render_all(rendered));
 
         Ok(BuiltSite {
             pages,
