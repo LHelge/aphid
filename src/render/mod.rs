@@ -110,8 +110,14 @@ impl<'a> Renderer<'a> {
         pages.extend(self.render_tag_pages(site, &site_ctx)?);
         pages.extend(self.render_index_pages(rendered, &site_ctx, &wiki_categories)?);
 
-        let not_found_html =
-            self.render_template("404.html", &NotFoundContext { site: site_ctx })?;
+        let not_found_rendered = rendered.not_found().map(|(_, r)| r);
+        let not_found_content = not_found_rendered.map(NotFoundContent::from);
+        let not_found_ctx = NotFoundContext {
+            site: site_ctx,
+            not_found: not_found_content,
+            contains_mermaid: not_found_rendered.is_some_and(|r| r.contains_mermaid),
+        };
+        let not_found_html = self.render_template("404.html", &not_found_ctx)?;
 
         // ── Root files (favicon, then every RootArtifact) ───────────────
         let mut root_files: Vec<(String, Vec<u8>)> = Vec::new();

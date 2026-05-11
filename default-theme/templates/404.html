@@ -4,8 +4,7 @@
 
 {% block content %}
 <article class="error-page">
-    <h1>404 — Not Found</h1>
-    <p>The page you're looking for doesn't exist.</p>
-    <p><a href="/">Back to home</a></p>
+    <h1>404</h1>
+    {% if not_found %}{{ not_found.content | safe }}{% endif %}
 </article>
 {% endblock content %}

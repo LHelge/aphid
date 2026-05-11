@@ -1,5 +1,5 @@
 use crate::content::{
-    BlogFrontmatter, HomePage, Page, PageFrontmatter, Site, Slug, WikiFrontmatter,
+    BlogFrontmatter, HomePage, NotFoundPage, Page, PageFrontmatter, Site, Slug, WikiFrontmatter,
 };
 
 use super::Rendered;
@@ -20,6 +20,7 @@ pub struct RenderedSite<'a> {
     wiki: Vec<(&'a Page<WikiFrontmatter>, Rendered)>,
     pages: Vec<(&'a Page<PageFrontmatter>, Rendered)>,
     home: Option<(&'a HomePage, Rendered)>,
+    not_found: Option<(&'a NotFoundPage, Rendered)>,
     diagnostics: Diagnostics,
 }
 
@@ -33,14 +34,17 @@ impl<'a> RenderedSite<'a> {
         wiki: Vec<(&'a Page<WikiFrontmatter>, Rendered)>,
         pages: Vec<(&'a Page<PageFrontmatter>, Rendered)>,
         home: Option<(&'a HomePage, Rendered)>,
+        not_found: Option<(&'a NotFoundPage, Rendered)>,
     ) -> Self {
-        let diagnostics = Diagnostics::collect(&blog, &wiki, &pages, home.as_ref());
+        let diagnostics =
+            Diagnostics::collect(&blog, &wiki, &pages, home.as_ref(), not_found.as_ref());
         Self {
             site,
             blog,
             wiki,
             pages,
             home,
+            not_found,
             diagnostics,
         }
     }
@@ -63,6 +67,10 @@ impl<'a> RenderedSite<'a> {
 
     pub fn home(&self) -> Option<(&HomePage, &Rendered)> {
         self.home.as_ref().map(|(h, r)| (*h, r))
+    }
+
+    pub fn not_found(&self) -> Option<(&NotFoundPage, &Rendered)> {
+        self.not_found.as_ref().map(|(n, r)| (*n, r))
     }
 
     pub fn diagnostics(&self) -> &Diagnostics {
@@ -88,6 +96,7 @@ impl Diagnostics {
         wiki: &[(&Page<WikiFrontmatter>, Rendered)],
         pages: &[(&Page<PageFrontmatter>, Rendered)],
         home: Option<&(&HomePage, Rendered)>,
+        not_found: Option<&(&NotFoundPage, Rendered)>,
     ) -> Self {
         let mut broken_wiki_links = Vec::new();
 
@@ -113,10 +122,16 @@ impl Diagnostics {
             }
         }
 
-        if let Some((_, rendered)) = home {
+        for (source, rendered) in [
+            home.map(|(_, r)| (DiagnosticSource::Home, r)),
+            not_found.map(|(_, r)| (DiagnosticSource::NotFound, r)),
+        ]
+        .into_iter()
+        .flatten()
+        {
             for target in &rendered.broken_wiki_links {
                 broken_wiki_links.push(BrokenWikiLink {
-                    source: DiagnosticSource::Home,
+                    source: source.clone(),
                     target: target.clone(),
                 });
             }
@@ -133,13 +148,14 @@ pub struct BrokenWikiLink {
     pub target: String,
 }
 
-/// Where a diagnostic originated. The home page is special-cased because
-/// `home.md` has no slug — it's rendered through the same markdown pipeline
-/// but isn't a [`Page`](crate::content::Page).
+/// Where a diagnostic originated. `home.md` and `404.md` are special-cased
+/// because they have no slug — they're rendered through the same markdown
+/// pipeline but aren't [`Page`](crate::content::Page)s.
 #[derive(Debug, Clone)]
 pub enum DiagnosticSource {
     Page(Slug),
     Home,
+    NotFound,
 }
 
 impl std::fmt::Display for DiagnosticSource {
@@ -147,6 +163,7 @@ impl std::fmt::Display for DiagnosticSource {
         match self {
             Self::Page(slug) => write!(f, "{slug}"),
             Self::Home => write!(f, "home.md"),
+            Self::NotFound => write!(f, "404.md"),
         }
     }
 }

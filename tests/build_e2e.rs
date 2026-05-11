@@ -196,6 +196,80 @@ async fn broken_wiki_link_in_home_fails_build() {
 }
 
 #[tokio::test]
+async fn home_md_content_appears_in_home_html() {
+    let dir = TempDir::new().unwrap();
+    let content_dir = dir.path().join("content");
+    let config_path = common::write_fixture_config(dir.path(), &content_dir);
+
+    write_file(
+        &content_dir.join("home.md"),
+        "# Welcome\n\nThis page is from `home.md` — totally bespoke.\n",
+    );
+
+    let output = dir.path().join("dist");
+    aphid::build(&config_path, &output).await.unwrap();
+
+    let html = fs::read_to_string(output.join("index.html")).unwrap();
+    assert!(
+        html.contains("Welcome"),
+        "index.html should include the heading from home.md: {html}"
+    );
+    assert!(
+        html.contains("totally bespoke"),
+        "index.html should include the body from home.md: {html}"
+    );
+}
+
+#[tokio::test]
+async fn not_found_md_content_appears_in_404_html() {
+    let dir = TempDir::new().unwrap();
+    let content_dir = dir.path().join("content");
+    let config_path = common::write_fixture_config(dir.path(), &content_dir);
+
+    write_file(
+        &content_dir.join("404.md"),
+        "# Custom 404\n\nThis page is from `404.md` — totally bespoke.\n",
+    );
+
+    let output = dir.path().join("dist");
+    aphid::build(&config_path, &output).await.unwrap();
+
+    let html = fs::read_to_string(output.join("404.html")).unwrap();
+    assert!(
+        html.contains("Custom 404"),
+        "404.html should include the heading from 404.md: {html}"
+    );
+    assert!(
+        html.contains("totally bespoke"),
+        "404.html should include the body from 404.md: {html}"
+    );
+}
+
+#[tokio::test]
+async fn broken_wiki_link_in_not_found_fails_build() {
+    let dir = TempDir::new().unwrap();
+    let content_dir = dir.path().join("content");
+    let config_path = common::write_fixture_config(dir.path(), &content_dir);
+
+    write_file(
+        &content_dir.join("404.md"),
+        "# Gone\n\nTry [[missing-404-link]] instead.\n",
+    );
+
+    let result = aphid::build(&config_path, &dir.path().join("dist")).await;
+    let err = result.expect_err("build should fail on broken 404 wiki-link");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("missing-404-link"),
+        "error should mention the broken target: {msg}"
+    );
+    assert!(
+        msg.contains("404.md"),
+        "error should mention 404.md as the source: {msg}"
+    );
+}
+
+#[tokio::test]
 async fn build_output_does_not_contain_live_reload_script() {
     let (_dir, output) = build_fixture_site().await;
 

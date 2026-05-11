@@ -309,7 +309,7 @@ mod tests {
                 (p, r)
             })
             .collect();
-        RenderedSite::from_parts(site, blog, vec![], vec![], None)
+        RenderedSite::from_parts(site, blog, vec![], vec![], None, None)
     }
 
     fn test_config() -> crate::config::Config {

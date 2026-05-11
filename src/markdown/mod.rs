@@ -122,8 +122,13 @@ impl<'a> MarkdownRenderer<'a> {
             .collect();
 
         let home = self.site.home.as_ref().map(|h| (h, self.render(&h.body)));
+        let not_found = self
+            .site
+            .not_found
+            .as_ref()
+            .map(|n| (n, self.render(&n.body)));
 
-        RenderedSite::from_parts(self.site, blog, wiki, pages, home)
+        RenderedSite::from_parts(self.site, blog, wiki, pages, home, not_found)
     }
 }
 
