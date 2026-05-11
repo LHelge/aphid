@@ -19,7 +19,7 @@ use super::watcher;
 use crate::Error;
 use crate::config::Config;
 use crate::generated::FaviconSet;
-use crate::render::{Mode, RenderedSite, Theme};
+use crate::render::{BuiltSite, Theme};
 
 /// A configured-but-not-yet-bound HTTP server: the rendered site, the axum
 /// router, and the inputs needed to run the file watcher.
@@ -48,8 +48,9 @@ impl Server {
         };
         let favicon_set = initial_favicon.as_ref().map(|(set, _, _)| set.clone());
 
-        let rendered = RenderedSite::build_with_favicon(&config, &theme, Mode::Serve, favicon_set)?;
-        let state = Arc::new(AppState::new(rendered));
+        let built = BuiltSite::build_with_favicon(&config, &theme, favicon_set)?;
+        log_diagnostics(&built);
+        let state = Arc::new(AppState::new(built));
         let rebuilder = Rebuilder::with_initial_favicon(config_path.to_path_buf(), initial_favicon);
         let router = Self::build_router(Arc::clone(&state), &config);
         Ok(Self {
@@ -208,6 +209,19 @@ async fn shutdown_signal() {
     match tokio::signal::ctrl_c().await {
         Ok(()) => tracing::info!("received ctrl-c, shutting down"),
         Err(e) => tracing::error!("failed to install ctrl-c handler: {e}"),
+    }
+}
+
+/// Emit each pass-1 diagnostic from `built` as a `warn!` event. Serve mode
+/// renders broken-link spans in the page anyway so writing can continue;
+/// this surfaces them in the terminal as the author edits.
+pub(crate) fn log_diagnostics(built: &BuiltSite) {
+    for link in &built.diagnostics.broken_wiki_links {
+        tracing::warn!(
+            page = %link.source,
+            target = %link.target,
+            "broken wiki-link",
+        );
     }
 }
 

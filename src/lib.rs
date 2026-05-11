@@ -47,19 +47,30 @@ pub use error::Error;
 use std::path::Path;
 
 use config::Config;
-use render::{Mode, RenderedSite, Theme};
+use render::{BuiltSite, Theme};
 
 /// Build the site into the given output directory.
+///
+/// Broken `[[wiki-links]]` are fatal here: any diagnostics produced during
+/// pass 1 are converted into [`Error::BrokenWikiLinks`] before any output
+/// is written. The dev server applies a different policy — see
+/// [`serve`].
 pub async fn build(config_path: &Path, output_dir: &Path) -> Result<(), Error> {
     let config = Config::from_path(config_path)?;
 
     let theme = Theme::load(&config)?;
-    let rendered = RenderedSite::build(&config, &theme, Mode::Build)?;
+    let built = BuiltSite::build(&config, &theme)?;
+
+    if !built.diagnostics.is_empty() {
+        return Err(Error::BrokenWikiLinks(
+            built.diagnostics.broken_wiki_links.clone(),
+        ));
+    }
 
     // ── Write output ────────────────────────────────────────────────────────
     tracing::info!(output = %output_dir.display(), "writing output");
     let writer = output::OutputWriter::new(output_dir)?;
-    writer.write(&rendered, &theme, &config.static_dir)?;
+    writer.write(&built, &theme, &config.static_dir)?;
 
     tracing::info!("build complete");
     Ok(())

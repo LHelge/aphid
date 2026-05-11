@@ -7,7 +7,7 @@ use crate::Error;
 use crate::config::Config;
 use crate::content::slug::Slug;
 use crate::output::OutputWriter;
-use crate::render::{Mode, RenderedSite, Theme};
+use crate::render::{BuiltSite, Theme};
 
 struct Scaffold {
     dir: PathBuf,
@@ -284,9 +284,14 @@ default home page layout.
         let output_dir = dir.join("dist");
         let config = Config::from_path(&config_path)?;
         let theme = Theme::load(&config)?;
-        let rendered = RenderedSite::build(&config, &theme, Mode::Build)?;
+        let built = BuiltSite::build(&config, &theme)?;
+        if !built.diagnostics.is_empty() {
+            return Err(Error::BrokenWikiLinks(
+                built.diagnostics.broken_wiki_links.clone(),
+            ));
+        }
         let writer = OutputWriter::new(&output_dir)?;
-        writer.write(&rendered, &theme, &config.static_dir)?;
+        writer.write(&built, &theme, &config.static_dir)?;
         Ok(())
     }
 }
