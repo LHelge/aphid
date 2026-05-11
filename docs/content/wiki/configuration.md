@@ -32,11 +32,12 @@ All path fields are resolved relative to the directory containing `aphid.toml`, 
 
 # Source directory layout
 
-`aphid` expects three subdirectories under `source_dir`, plus an optional `home.md` file at the root:
+`aphid` expects three subdirectories under `source_dir`, plus two optional special files at the root:
 
 ```
 content/
   home.md    # optional — rendered into the `home` slot of home.html
+  404.md     # optional — rendered into the `not_found` slot of 404.html
   blog/      # dated posts (title, slug, author, created required)
   wiki/      # reference pages (all frontmatter optional)
   pages/     # standalone pages like About / Contact (title required)
@@ -44,7 +45,7 @@ content/
 
 Any of the three subdirectories may be absent — a site without `wiki/` simply has no wiki. Subdirectories below each kind are not walked: every `.md` file must sit directly in `blog/`, `wiki/`, or `pages/`. Files without a `.md` extension are ignored.
 
-`content/home.md` is a special, optional, single file. Unlike other content types it does **not** use frontmatter — the entire file is markdown. It runs through the same render pipeline as every other page (wiki-links, heading anchors, syntax highlighting), but it is *not* a routable URL — its rendered HTML is exposed to the `home.html` template as the `home` variable so the template can embed it. Use `#` for section headings; the markdown pipeline shifts `#` → `<h2>`, so multiple sections in `home.md` produce a clean run of `<h2>`s. See [[themes]] for the template variable shape.
+`content/home.md` and `content/404.md` are special, optional, single files. Unlike other content types they do **not** use frontmatter — the entire file is markdown. Each runs through the same render pipeline as every other page (wiki-links, heading anchors, syntax highlighting, mermaid), but neither is a routable URL — their rendered HTML is exposed to its template as a variable (`home` on `home.html`, `not_found` on `404.html`) so the template can embed it. Use `#` for section headings; the markdown pipeline shifts `#` → `<h2>`, so multiple sections produce a clean run of `<h2>`s. See [[themes]] for the template variable shapes.
 
 See [[frontmatter]] for the fields required by each content type.
 

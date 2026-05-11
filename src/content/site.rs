@@ -21,7 +21,37 @@ pub struct HomePage {
     pub path: PathBuf,
 }
 
-fn load_home(path: &Path) -> Result<Option<HomePage>, Error> {
+impl HomePage {
+    /// Load `home.md` from `path` if it exists. Missing file returns `Ok(None)`;
+    /// non-UTF-8 content returns a typed [`Error::NotUtf8`].
+    fn load(path: &Path) -> Result<Option<Self>, Error> {
+        Ok(load_bodyless(path)?.map(|(body, path)| Self { body, path }))
+    }
+}
+
+/// Optional 404-page content loaded from `content/404.md`. Renders into
+/// the `404.html` template as the `not_found` variable. Same loading and
+/// pipeline rules as [`HomePage`]: plain markdown, no frontmatter, full
+/// markdown pipeline (wiki-links, headings, highlight, mermaid).
+pub struct NotFoundPage {
+    pub body: String,
+    pub path: PathBuf,
+}
+
+impl NotFoundPage {
+    /// Load `404.md` from `path` if it exists. Same semantics as
+    /// [`HomePage::load`].
+    fn load(path: &Path) -> Result<Option<Self>, Error> {
+        Ok(load_bodyless(path)?.map(|(body, path)| Self { body, path }))
+    }
+}
+
+/// Shared read-helper for `home.md` / `404.md` style files: plain markdown,
+/// no frontmatter. Returns `Ok(None)` if the file is absent. Lives as a free
+/// function because the result `(body, path)` doesn't belong to either type
+/// — each owning type wraps it in the [`HomePage::load`] /
+/// [`NotFoundPage::load`] constructor.
+fn load_bodyless(path: &Path) -> Result<Option<(String, PathBuf)>, Error> {
     if !path.is_file() {
         return Ok(None);
     }
@@ -36,10 +66,7 @@ fn load_home(path: &Path) -> Result<Option<HomePage>, Error> {
             source: Box::new(Error::Io(e)),
         }
     })?;
-    Ok(Some(HomePage {
-        body,
-        path: path.to_path_buf(),
-    }))
+    Ok(Some((body, path.to_path_buf())))
 }
 
 /// The fully-loaded site: every page on disk, plus the cross-cutting
@@ -55,6 +82,8 @@ pub struct Site {
     pub pages: Vec<Page<PageFrontmatter>>,
     /// Optional home-page content loaded from `<source_dir>/home.md`.
     pub home: Option<HomePage>,
+    /// Optional 404-page content loaded from `<source_dir>/404.md`.
+    pub not_found: Option<NotFoundPage>,
     /// Index of every slug across blog/wiki/pages — supports `[[wiki-link]]`
     /// resolution. Crate-private; use [`Site::get`] to look up.
     pub(crate) slug_index: HashMap<Slug, (PageKind, usize)>,
@@ -201,7 +230,8 @@ impl Site {
         let mut pages = load_dir(&src.join("pages"), |_: &PageFrontmatter, path: &Path| {
             stem(path)
         })?;
-        let home = load_home(&src.join("home.md"))?;
+        let home = HomePage::load(&src.join("home.md"))?;
+        let not_found = NotFoundPage::load(&src.join("404.md"))?;
 
         for page in &mut wiki {
             if page.frontmatter.title.is_empty() {
@@ -217,6 +247,7 @@ impl Site {
 
         let mut site = Self::from_parts(config, blog, wiki, pages)?;
         site.home = home;
+        site.not_found = not_found;
         Ok(site)
     }
 
@@ -238,6 +269,7 @@ impl Site {
             wiki,
             pages,
             home: None,
+            not_found: None,
             slug_index,
             tag_index,
             backlinks,
@@ -448,6 +480,7 @@ mod tests {
             wiki: vec![make_wiki_page("glossary")],
             pages: vec![make_standalone_page("about")],
             home: None,
+            not_found: None,
             slug_index,
             tag_index: HashMap::new(),
             backlinks: HashMap::new(),
@@ -546,6 +579,29 @@ About page.
         let cfg = minimal_config(dir.path());
         let site = Site::load(cfg).unwrap();
         assert!(site.home.is_none());
+    }
+
+    #[test]
+    fn not_found_md_loaded_when_present() {
+        let dir = TempDir::new().unwrap();
+        let src = dir.path();
+
+        write_file(&src.join("404.md"), "# Lost\n\nNothing here.\n");
+
+        let cfg = minimal_config(src);
+        let site = Site::load(cfg).unwrap();
+
+        let nf = site.not_found.as_ref().expect("404.md should be loaded");
+        assert!(nf.body.contains("# Lost"));
+        assert!(nf.body.contains("Nothing here."));
+    }
+
+    #[test]
+    fn not_found_md_absent_yields_none() {
+        let dir = TempDir::new().unwrap();
+        let cfg = minimal_config(dir.path());
+        let site = Site::load(cfg).unwrap();
+        assert!(site.not_found.is_none());
     }
 
     #[test]

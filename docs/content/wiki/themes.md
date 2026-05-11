@@ -183,7 +183,21 @@ Renders one page of a tag's post listing. Page 1 lives at `/tags/{slug}/`; subse
 
 ## 404.html
 
-No additional variables beyond the site-level ones.
+Renders to `dist/404.html` (and is served by `aphid serve` for any unknown path). Optionally receives content from `content/404.md`; if the file isn't present the variable is `null` and the template's hardcoded fallback runs.
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `not_found` | object? | Present when `content/404.md` exists. Has `content` (string, the rendered HTML — pass through `\| safe`). |
+| `contains_mermaid` | bool | `true` when `404.md` contains at least one ` ```mermaid ` block. See [Mermaid diagrams](#mermaid-diagrams) |
+
+Templates carry the visual structure (the big "404" hero); the message is the author's job, written in `content/404.md`. Without `404.md` the page renders just the hero:
+
+```jinja2
+<div class="error-code">404</div>
+{% if not_found %}
+{{ not_found.content | safe }}
+{% endif %}
+```
 
 # Static files
 

@@ -223,6 +223,23 @@ impl From<&Rendered> for HomeContent {
     }
 }
 
+/// Rendered 404-page content from `content/404.md`, exposed to the
+/// `404.html` template under the `not_found` variable. Same shape and
+/// rules as [`HomeContent`] — themes use it as
+/// `{% if not_found %}{{ not_found.content | safe }}{% endif %}`.
+#[derive(Debug, Clone, Serialize)]
+pub struct NotFoundContent {
+    pub content: String,
+}
+
+impl From<&Rendered> for NotFoundContent {
+    fn from(rendered: &Rendered) -> Self {
+        Self {
+            content: rendered.html.clone(),
+        }
+    }
+}
+
 /// Context for the home page (`/`). Same posts as the blog index, plus
 /// the optional rendered home-page content. `contains_mermaid` mirrors
 /// the field on the page contexts so `base.html` can use one check
@@ -360,11 +377,16 @@ pub struct TagsIndexContext {
     pub tags: Vec<TagEntry>,
 }
 
-/// Context for the 404 page.
+/// Context for the 404 page. `not_found` is populated when
+/// `content/404.md` exists; otherwise themes fall back to whatever copy
+/// they ship hardcoded. `contains_mermaid` mirrors the field on other
+/// page contexts so `base.html` can use one check across all page types.
 #[derive(Debug, Serialize)]
 pub struct NotFoundContext {
     #[serde(flatten)]
     pub site: SiteContext,
+    pub not_found: Option<NotFoundContent>,
+    pub contains_mermaid: bool,
 }
 
 /// Shared site-level fields present in every template context.
