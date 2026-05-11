@@ -29,10 +29,11 @@
 //! # }
 //! ```
 
+pub mod artifacts;
 pub mod config;
 pub mod content;
 mod error;
-pub mod generated;
+pub mod favicon;
 mod html;
 pub mod markdown;
 pub mod output;

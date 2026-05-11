@@ -6,7 +6,7 @@ use crate::config::{Config, Social};
 use crate::content::page::{Page, PageKind};
 use crate::content::slug::Slug;
 use crate::content::{BlogFrontmatter, PageFrontmatter, PageView, Site, WikiFrontmatter};
-use crate::generated::FaviconSet;
+use crate::favicon::FaviconSet;
 use crate::markdown::{HeadingEntry, Rendered};
 
 /// A single nav entry for standalone pages, available to all templates.

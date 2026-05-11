@@ -3,7 +3,7 @@ use std::time::SystemTime;
 
 use crate::Error;
 use crate::config::Config;
-use crate::generated::FaviconSet;
+use crate::favicon::FaviconSet;
 use crate::render::{BuiltSite, Theme};
 
 /// Owns the per-rebuild state of `aphid serve`: the path to `aphid.toml`
