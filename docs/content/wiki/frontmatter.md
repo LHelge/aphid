@@ -13,7 +13,7 @@ Every content file begins with a YAML frontmatter block delimited by `---`. The 
 |-------|----------|-------------|
 | `title` | yes | Post title |
 | `slug` | yes | URL segment — must be unique across all content |
-| `author` | yes | Author name |
+| `author` | yes | Author name — matched against `[[authors]]` in `aphid.toml` to resolve email and profile image |
 | `created` | yes | Publication date (`YYYY-MM-DD`) |
 | `updated` | no | Last-edited date |
 | `image` | no | Path or URL to a hero image, rendered above the post body and shown in blog listings |

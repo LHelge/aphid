@@ -14,6 +14,7 @@ fn default_static_dir() -> PathBuf {
 pub struct Author {
     pub name: String,
     pub email: Option<String>,
+    pub image: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

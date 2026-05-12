@@ -7,7 +7,18 @@
         <div class="post-meta">
             {% if created %}<time>{{ created }}</time>{% endif %}
             {% if updated %}<time>(updated {{ updated }})</time>{% endif %}
-            {% if author %}<span class="author">by {{ author }}</span>{% endif %}
+            {% if author %}
+            <span class="author">
+                {% if author.email %}<a href="mailto:{{ author.email }}" class="author-link">{% endif %}
+                {% if author.image %}
+                <img src="{{ author.image }}" alt="{{ author.name }}" class="author-avatar">
+                {% else %}
+                <svg class="author-avatar" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="#e0e0e0"/><circle cx="16" cy="12" r="5" fill="#9e9e9e"/><path d="M6 28c0-5.5 4.5-10 10-10s10 4.5 10 10" fill="#9e9e9e"/></svg>
+                {% endif %}
+                {{ author.name }}
+                {% if author.email %}</a>{% endif %}
+            </span>
+            {% endif %}
         </div>
         {% if description %}<p class="post-description">{{ description }}</p>{% endif %}
         {% if tags | length > 0 %}

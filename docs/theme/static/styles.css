@@ -1150,6 +1150,36 @@ a:hover {
   color: var(--surface1);
 }
 
+.post-meta-dates {
+  margin-top: 12px;
+}
+
+.author {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.author-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+}
+
+.author-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.author-link:hover {
+  text-decoration: underline;
+}
+
 /* ── Wiki layout (sidebar + content + optional TOC) ──────────────────────── */
 .wiki-layout {
   max-width: var(--max-width);

@@ -9,6 +9,49 @@ use crate::content::{BlogFrontmatter, PageFrontmatter, PageView, Site, WikiFront
 use crate::favicon::FaviconSet;
 use crate::markdown::{HeadingEntry, Rendered};
 
+/// Author metadata resolved from config, exposed to blog post templates.
+///
+/// The frontmatter `author` string is looked up against `[[authors]]` in
+/// `aphid.toml`. If found, the full author record (email, image) is used;
+/// otherwise only the name survives.
+#[derive(Debug, Clone, Serialize)]
+pub struct AuthorContext {
+    pub name: String,
+    pub email: Option<String>,
+    pub image: Option<String>,
+}
+
+impl AuthorContext {
+    /// Build an `AuthorContext` by looking up the given name in the config
+    /// authors list. Image paths that are not absolute URLs get prefixed
+    /// with `/static/`.
+    pub fn resolve(name: &str, site: &Site) -> Self {
+        let author = site.config.authors.iter().find(|a| a.name == name);
+        match author {
+            Some(a) => Self {
+                name: a.name.clone(),
+                email: a.email.clone(),
+                image: a.image.as_ref().map(|img| resolve_image_path(img)),
+            },
+            None => Self {
+                name: name.to_owned(),
+                email: None,
+                image: None,
+            },
+        }
+    }
+}
+
+/// If a path starts with `http://` or `https://`, use it verbatim;
+/// otherwise prefix with `/static/`.
+fn resolve_image_path(path: &str) -> String {
+    if path.starts_with("http://") || path.starts_with("https://") {
+        path.to_owned()
+    } else {
+        format!("/static/{path}")
+    }
+}
+
 /// A single nav entry for standalone pages, available to all templates.
 #[derive(Debug, Clone, Serialize)]
 pub struct NavEntry {
@@ -507,7 +550,7 @@ impl WikiPageContext {
 pub struct BlogPostContext {
     #[serde(flatten)]
     pub base: StandalonePageContext,
-    pub author: String,
+    pub author: AuthorContext,
     pub image: Option<String>,
     pub description: Option<String>,
     pub created: String,
@@ -539,7 +582,7 @@ impl BlogPostContext {
         };
         Self {
             base,
-            author: page.frontmatter.author.clone(),
+            author: AuthorContext::resolve(&page.frontmatter.author, site),
             image: page.frontmatter.image.clone(),
             description: page.frontmatter.description.clone(),
             created: page.frontmatter.created.to_string(),

@@ -10,6 +10,7 @@ wiki_categories = ["Getting Started", "Content", "Customization", "Development"]
 [[authors]]
 name = "LHelge"
 email = "lhelge@lhelge.se"
+image = "authors/lhelge.png"
 
 [[socials]]
 platform = "GitHub"
