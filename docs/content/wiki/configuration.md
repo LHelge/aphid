@@ -94,7 +94,12 @@ If `favicon` is not set, no files are generated and `favicon_tags` is empty.
 [[authors]]
 name = "Alice"
 email = "alice@example.com"   # optional
+image = "authors/alice.jpg"   # optional — relative to static/, or an absolute URL
 ```
+
+The `image` field sets the author's profile picture shown on blog posts. Relative paths are resolved against the site's `static/` directory (served at `/static/`). Absolute URLs (`https://…`) are used verbatim.
+
+When no `image` is configured, templates could render a default gray silhouette avatar.
 
 # Socials
 
@@ -115,6 +120,8 @@ favicon = "static/favicon.png"
 
 [[authors]]
 name = "Alice"
+email = "alice@example.com"
+image = "authors/alice.jpg"
 
 [[socials]]
 platform = "github"
