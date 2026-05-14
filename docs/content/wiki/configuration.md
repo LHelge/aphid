@@ -93,9 +93,12 @@ If `favicon` is not set, no files are generated and `favicon_tags` is empty.
 ```toml
 [[authors]]
 name = "Alice"
-email = "alice@example.com"   # optional
-image = "authors/alice.jpg"   # optional — relative to static/, or an absolute URL
+link = "https://alice.example.com"  # optional — used verbatim as the author link
+email = "alice@example.com"         # optional — falls back to `mailto:` link if `link` is unset
+image = "authors/alice.jpg"         # optional — relative to static/, or an absolute URL
 ```
+
+The `link` field is exposed to blog templates as `author.link`. When it's unset but `email` is configured, templates receive `mailto:{email}` instead. With neither set, `author.link` is absent and templates render the author name as plain text.
 
 The `image` field sets the author's profile picture shown on blog posts. Relative paths are resolved against the site's `static/` directory (served at `/static/`). Absolute URLs (`https://…`) are used verbatim.
 
@@ -120,6 +123,7 @@ favicon = "static/favicon.png"
 
 [[authors]]
 name = "Alice"
+link = "https://alice.example.com"
 email = "alice@example.com"
 image = "authors/alice.jpg"
 

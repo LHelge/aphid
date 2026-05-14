@@ -26,7 +26,7 @@
         <div class="post-meta">
           {% if author %}
           <span class="author">
-            {% if author.email %}<a href="mailto:{{ author.email }}" class="author-link">{% endif %}
+            {% if author.link %}<a href="{{ author.link }}" class="author-link">{% endif %}
               {% if author.image %}
               <img src="{{ author.image }}" alt="{{ author.name }}" class="author-avatar">
               {% else %}
@@ -37,7 +37,7 @@
               </svg>
               {% endif %}
               {{ author.name }}
-              {% if author.email %}</a>{% endif %}
+              {% if author.link %}</a>{% endif %}
           </span>
           {% endif %}
         </div>
