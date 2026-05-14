@@ -66,6 +66,11 @@ pub struct Config {
     /// Path to a source image (PNG, JPEG, SVG, etc.) used to generate
     /// favicons at standard sizes.
     pub favicon: Option<PathBuf>,
+    /// Root-relative path or absolute URL to an image used as the default
+    /// OpenGraph / Twitter card image for pages without their own. Write
+    /// it as `/static/social-card.png` or an absolute URL — matching the
+    /// convention used for blog hero images and `favicon`.
+    pub social_image: Option<String>,
     /// Maximum number of blog posts included in RSS/Atom feeds. Set to `0`
     /// to include all posts. Defaults to 20.
     #[serde(default = "default_feed_limit")]

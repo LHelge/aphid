@@ -77,7 +77,9 @@ These come from `base.html` and are available in all templates via inheritance:
 | Variable | Type | Description |
 |----------|------|-------------|
 | `site_title` | string | From `title` in `aphid.toml` |
-| `base_url` | string | From `base_url` in `aphid.toml` |
+| `base_url` | string | From `base_url` in `aphid.toml`, with any trailing slash stripped — safe to concatenate as `{{ base_url }}{{ url }}` |
+| `site_description` | string? | From `description` in `aphid.toml`. Used as the OpenGraph description fallback on pages without their own |
+| `social_image_url` | string? | Absolute URL for the site-wide default OpenGraph / Twitter card image — from `social_image` in `aphid.toml`. `None` when no `social_image` is configured |
 | `version` | string | The `aphid` binary version |
 | `nav_pages` | list | Standalone pages sorted by `order`; each has `title` and `url` |
 | `socials` | list | Social links from `aphid.toml`; each has `platform` and `url` |
@@ -105,6 +107,7 @@ Universal page variables, plus:
 |----------|------|-------------|
 | `author` | object | Author metadata resolved from config. Has `.name` (string), `.link` (string?), `.image` (string?). If the frontmatter author name matches a `[[authors]]` entry in `aphid.toml`, `.link` and `.image` are populated from config; otherwise only `.name` is set. `.link` uses the author's `link` field if set, falling back to `mailto:{email}` when only `email` is configured. |
 | `image` | string? | Hero/headline image path or URL, from frontmatter |
+| `og_image` | string? | Absolute URL of the post's OpenGraph / Twitter card image — `image` resolved against `base_url`, or the site `social_image_url` fallback. `None` when neither is set |
 | `description` | string? | Short summary, from frontmatter |
 | `created` | string | Publication date, formatted `YYYY-MM-DD` |
 | `updated` | string? | Last-edited date |
@@ -198,6 +201,26 @@ Templates carry the visual structure (the big "404" hero); the message is the au
 {{ not_found.content | safe }}
 {% endif %}
 ```
+
+# Social meta tags
+
+The bundled themes' `base.html` emits OpenGraph and Twitter card meta tags in the `<head>` of every page, derived from context variables. Custom themes get the same behaviour by inheriting from `base.html`. Two blocks are exposed for overrides:
+
+| Block | Default | Override on |
+|-------|---------|-------------|
+| `og_type` | `"website"` | `blog_post.html` → `"article"` |
+| `article_meta` | empty | `blog_post.html` → `article:published_time`, `article:modified_time`, `article:author`, `article:tag` |
+
+Tag content comes from these context fields:
+
+- `og:title` / `twitter:title` — page `title`, falling back to `site_title`
+- `og:description` / `twitter:description` / `<meta name="description">` — page `description`, falling back to `site_description`
+- `og:url` — `base_url` + page `url` (only emitted when the page has a `url`)
+- `og:image` / `twitter:image` — blog post `og_image`, falling back to `social_image_url`
+- `twitter:card` — `summary_large_image` when an image is set, `summary` otherwise
+- `og:site_name` — `site_title`
+
+Pages without an image still produce valid tags — they just drop the `og:image` / `twitter:image` lines and downgrade the card type to `summary`.
 
 # Static files
 

@@ -25,6 +25,7 @@ tags:
 | `wiki_categories` | `[]` | Order for wiki category headings — see [Wiki category order](#wiki-category-order) |
 | `wiki_default_category` | `"Other"` | Display name for wiki pages without an explicit `category` in frontmatter. Surfaces both as the page's own category label and as the heading for the catch-all group on the wiki index |
 | `favicon` | | Path to a source image used to generate favicons at standard sizes — see [Favicon](#favicon) |
+| `social_image` | | Path or absolute URL to the default OpenGraph / Twitter card image — see [Social image](#social-image) |
 | `feed_limit` | `20` | Maximum number of blog posts in RSS/Atom feeds. Set to `0` to include all posts |
 | `posts_per_page` | `10` | Posts shown per page on the blog index and tag pages — see [[pagination]] |
 
@@ -88,21 +89,31 @@ If `favicon` is not set, no files are generated and `favicon_tags` is empty.
 > [!NOTE]
 > In `aphid serve`, the favicon set is cached and only regenerated when the source image's mtime changes. Editing markdown triggers a fast rebuild that reuses the cached set; saving a new `favicon.png` triggers a rebuild that detects the change and re-encodes (the resize step takes ~700 ms, but only when it actually has work to do).
 
+# Social image
+
+```toml
+social_image = "/static/social-card.png"
+```
+
+The site-wide default for OpenGraph (`og:image`) and Twitter (`twitter:image`) tags — what social platforms and chat apps use as the preview when someone shares a link. Used as the fallback on pages without their own image. Blog posts override it with their frontmatter `image`.
+
+Write the path as a root-relative URL (`/static/social-card.png`) or an absolute `http(s)://` URL, matching the convention used for blog hero images and `favicon`. Social crawlers fetch out of site context, so the rendered meta tags always carry the full URL built from `base_url`.
+
+Recommended dimensions: 1200×630 px (the format most platforms render best as `summary_large_image`).
+
 # Authors
 
 ```toml
 [[authors]]
 name = "Alice"
-link = "https://alice.example.com"  # optional — used verbatim as the author link
-email = "alice@example.com"         # optional — falls back to `mailto:` link if `link` is unset
-image = "authors/alice.jpg"         # optional — relative to static/, or an absolute URL
+link = "https://alice.example.com"     # optional — used verbatim as the author link
+email = "alice@example.com"            # optional — falls back to `mailto:` link if `link` is unset
+image = "/static/authors/alice.jpg"    # optional — root-relative URL or absolute URL
 ```
 
 The `link` field is exposed to blog templates as `author.link`. When it's unset but `email` is configured, templates receive `mailto:{email}` instead. With neither set, `author.link` is absent and templates render the author name as plain text.
 
-The `image` field sets the author's profile picture shown on blog posts. Relative paths are resolved against the site's `static/` directory (served at `/static/`). Absolute URLs (`https://…`) are used verbatim.
-
-When no `image` is configured, templates could render a default gray silhouette avatar.
+The `image` field sets the author's profile picture shown on blog posts. Write it as a root-relative URL (`/static/authors/alice.jpg`) or an absolute `http(s)://` URL — same convention as blog hero images and `favicon`. When no `image` is configured, templates could render a default gray silhouette avatar.
 
 # Socials
 
@@ -125,7 +136,7 @@ favicon = "static/favicon.png"
 name = "Alice"
 link = "https://alice.example.com"
 email = "alice@example.com"
-image = "authors/alice.jpg"
+image = "/static/authors/alice.jpg"
 
 [[socials]]
 platform = "github"

@@ -1,5 +1,14 @@
 {% extends "base.html" %}
 
+{% block og_type %}article{% endblock og_type %}
+
+{% block article_meta %}
+    <meta property="article:published_time" content="{{ created }}">
+    {% if updated %}<meta property="article:modified_time" content="{{ updated }}">{% endif %}
+    {% if author %}<meta property="article:author" content="{{ author.name }}">{% endif %}
+    {% for tag in tags %}<meta property="article:tag" content="{{ tag.name }}">{% endfor %}
+{% endblock article_meta %}
+
 {% block content %}
 <article class="blog-post">
     <header>
