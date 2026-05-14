@@ -6,12 +6,13 @@ static_dir = "static"
 theme_dir = "theme"
 favicon = "static/favicon.png"
 wiki_categories = ["Getting Started", "Content", "Customization", "Development"]
+social_image = "/static/social.png"
 
 [[authors]]
 name = "LHelge"
 link = "https://lhelge.se"
 email = "lhelge@lhelge.se"
-image = "authors/lhelge.png"
+image = "/static/authors/lhelge.png"
 
 [[socials]]
 platform = "GitHub"

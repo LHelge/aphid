@@ -23,8 +23,10 @@ pub struct AuthorContext {
 
 impl AuthorContext {
     /// Build an `AuthorContext` by looking up the given name in the config
-    /// authors list. Image paths that are not absolute URLs get prefixed
-    /// with `/static/`.
+    /// authors list. The author's `image` path is exposed verbatim — write
+    /// it as a root-relative URL (`/static/authors/alice.jpg`) or an
+    /// absolute one, matching the convention used for blog hero images
+    /// and the `favicon` config field.
     pub fn resolve(name: &str, site: &Site) -> Self {
         let author = site.config.authors.iter().find(|a| a.name == name);
 
@@ -35,7 +37,7 @@ impl AuthorContext {
                     .link
                     .clone()
                     .or_else(|| a.email.as_ref().map(|email| format!("mailto:{email}"))),
-                image: a.image.as_ref().map(|img| resolve_image_path(img)),
+                image: a.image.clone(),
             },
             None => Self {
                 name: name.to_owned(),
@@ -46,13 +48,22 @@ impl AuthorContext {
     }
 }
 
-/// If a path starts with `http://` or `https://`, use it verbatim;
-/// otherwise prefix with `/static/`.
-fn resolve_image_path(path: &str) -> String {
+/// Join a root-relative or already-absolute URL with the site `base_url`
+/// to produce a fully qualified URL — needed for OpenGraph / Twitter
+/// card meta tags, which crawlers fetch out of site context.
+///
+/// `base_url` is expected to be normalized (no trailing slash). The
+/// input `path` must be either an absolute `http(s)://` URL (used
+/// verbatim) or a root-relative path beginning with `/`; bare paths
+/// are joined as-is with a separator, but the convention across aphid
+/// is to always write them root-relative (e.g. `/static/foo.png`).
+fn absolutize_url(path: &str, base_url: &str) -> String {
     if path.starts_with("http://") || path.starts_with("https://") {
         path.to_owned()
+    } else if path.starts_with('/') {
+        format!("{base_url}{path}")
     } else {
-        format!("/static/{path}")
+        format!("{base_url}/{path}")
     }
 }
 
@@ -440,7 +451,16 @@ pub struct NotFoundContext {
 #[derive(Debug, Clone, Serialize)]
 pub struct SiteContext {
     pub site_title: String,
+    /// Site `base_url` with any trailing slash stripped so templates can
+    /// safely concatenate `{{ base_url }}{{ url }}` for canonical URLs.
     pub base_url: String,
+    /// Site-wide description from config, exposed for SEO `<meta>` tags
+    /// and as the OpenGraph description fallback on pages without their
+    /// own.
+    pub site_description: Option<String>,
+    /// Absolute URL for the site-wide default OpenGraph / Twitter card
+    /// image. `None` when no `social_image` is configured.
+    pub social_image_url: Option<String>,
     pub version: String,
     pub nav_pages: Vec<NavEntry>,
     pub socials: Vec<Social>,
@@ -459,9 +479,16 @@ impl SiteContext {
         pages: &[Page<PageFrontmatter>],
         favicon: Option<&FaviconSet>,
     ) -> Self {
+        let base_url = config.normalized_base_url().to_owned();
+        let social_image_url = config
+            .social_image
+            .as_deref()
+            .map(|p| absolutize_url(p, &base_url));
         Self {
             site_title: config.title.clone(),
-            base_url: config.base_url.clone(),
+            base_url,
+            site_description: config.description.clone(),
+            social_image_url,
             version: env!("CARGO_PKG_VERSION").to_string(),
             nav_pages: NavEntry::from_pages(pages),
             socials: config.socials.clone(),
@@ -556,6 +583,10 @@ pub struct BlogPostContext {
     pub base: StandalonePageContext,
     pub author: AuthorContext,
     pub image: Option<String>,
+    /// Absolute URL for the post's OpenGraph / Twitter card image —
+    /// the frontmatter `image` made absolute, or the site `social_image`
+    /// fallback. `None` when neither is set.
+    pub og_image: Option<String>,
     pub description: Option<String>,
     pub created: String,
     pub updated: Option<String>,
@@ -576,6 +607,12 @@ impl BlogPostContext {
         site_ctx: &SiteContext,
     ) -> Self {
         let (newer, older) = site.blog_neighbours_of(page);
+        let og_image = page
+            .frontmatter
+            .image
+            .as_deref()
+            .map(|img| absolutize_url(img, &site_ctx.base_url))
+            .or_else(|| site_ctx.social_image_url.clone());
         let base = StandalonePageContext {
             site: site_ctx.clone(),
             title: page.frontmatter.title.clone(),
@@ -588,6 +625,7 @@ impl BlogPostContext {
             base,
             author: AuthorContext::resolve(&page.frontmatter.author, site),
             image: page.frontmatter.image.clone(),
+            og_image,
             description: page.frontmatter.description.clone(),
             created: page.frontmatter.created.to_string(),
             updated: page.frontmatter.updated.map(|d| d.to_string()),

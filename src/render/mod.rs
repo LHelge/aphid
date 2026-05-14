@@ -391,6 +391,8 @@ mod tests {
         SiteContext {
             site_title: "Test".into(),
             base_url: "http://localhost".into(),
+            site_description: None,
+            social_image_url: None,
             version: "0.0.0".into(),
             nav_pages: vec![],
             socials: vec![],
