@@ -36,7 +36,7 @@ Target a heading on the destination page by appending `#section` after the slug:
 [[configuration#authors|the authors section]]
 ```
 
-The anchor text is slugified the same way as heading IDs (lowercased, non-alphanumerics replaced by `-`), so `[[configuration#Authors]]` and `[[configuration#authors]]` both resolve to the same fragment.
+The anchor text is slugified the same way as heading IDs (lowercased, non-alphanumerics replaced by `-`), so `[[configuration#Authors]]` and `[[configuration#authors]]` both resolve to the same fragment. To target an author-supplied id instead, use the literal id from the heading's `{#…}` attribute — see [[markdown#custom-ids]].
 
 A bare cross-page anchor renders as `Page Title > section` so the reader sees which page they're heading to. Pipe-alias for a cleaner label when you don't want that:
 

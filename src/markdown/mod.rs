@@ -35,6 +35,7 @@ fn markdown_options() -> Options {
     options.insert(Options::ENABLE_WIKILINKS);
     options.insert(Options::ENABLE_GFM);
     options.insert(Options::ENABLE_SMART_PUNCTUATION);
+    options.insert(Options::ENABLE_HEADING_ATTRIBUTES);
     options
 }
 

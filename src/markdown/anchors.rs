@@ -2,13 +2,15 @@ use pulldown_cmark::{Event, Tag, TagEnd};
 use std::collections::HashMap;
 
 use crate::content::Slug;
+use crate::html::escape_html;
 
 fn slugify(text: &str) -> String {
     Slug::from(text).to_string()
 }
 
 /// One heading captured during rendering. `level` is the *output* level
-/// (after the +1 shift, capped at 6), `id` is the slugified anchor.
+/// (after the +1 shift, capped at 6), `id` is the anchor — either the
+/// slugified heading text or an author-supplied `{#custom-id}` attribute.
 pub struct HeadingEntry {
     pub level: u8,
     pub text: String,
@@ -20,50 +22,72 @@ pub struct HeadingEntry {
 /// start at h2. Levels are capped at h6.
 const HEADING_LEVEL_OFFSET: u8 = 1;
 
-/// Walk an event stream, replacing each heading with raw HTML carrying a
-/// slug-based `id` attribute, and return the collected headings for use
-/// in a table-of-contents. Heading levels are shifted up by one (so `#`
+/// Per-heading parsing state buffered between `Start(Heading)` and
+/// `End(Heading)` events. Inner events are held back rather than emitted
+/// inline so the opening `<hN id="…">` tag can be written first.
+struct HeadingBuf<'a> {
+    source_level: u8,
+    /// Raw `{#…}` attribute from the source, if any. Used verbatim
+    /// (modulo collision-suffixing) — not slugified, so authors keep
+    /// control over the exact anchor.
+    custom_id: Option<String>,
+    /// Plain-text accumulator used to slugify the heading text when no
+    /// custom id is supplied. Inline-code backticks are stripped.
+    text: String,
+    /// Inner events buffered for emission between the open and close tags.
+    inner: Vec<Event<'a>>,
+}
+
+/// Walk an event stream, replacing each heading with raw HTML carrying an
+/// `id` attribute, and return the collected headings for use in a
+/// table-of-contents. Heading levels are shifted up by one (so `#`
 /// renders as `<h2>` — the page title is `<h1>`, supplied by the
-/// template) and capped at `<h6>`. Duplicate slugs get `-2`, `-3`, …
-/// suffixes.
+/// template) and capped at `<h6>`. The id is the author-supplied
+/// `{#custom-id}` attribute when present, otherwise the slugified
+/// heading text. Both share a single namespace: any collision (auto or
+/// custom) gets a `-2`, `-3`, … suffix.
 pub fn inject_heading_ids<'a>(events: Vec<Event<'a>>) -> (Vec<Event<'a>>, Vec<HeadingEntry>) {
     let mut out = Vec::with_capacity(events.len());
     let mut toc = Vec::new();
     let mut used_ids: HashMap<String, usize> = HashMap::new();
 
-    // (source_level, accumulated_text_for_slug, buffered_inner_events)
-    let mut heading_buf: Option<(u8, String, Vec<Event<'a>>)> = None;
+    let mut heading_buf: Option<HeadingBuf<'a>> = None;
 
     for event in events {
         match heading_buf.take() {
             None => match event {
-                Event::Start(Tag::Heading { level, .. }) => {
-                    heading_buf = Some((level as u8, String::new(), Vec::new()));
+                Event::Start(Tag::Heading { level, id, .. }) => {
+                    heading_buf = Some(HeadingBuf {
+                        source_level: level as u8,
+                        custom_id: id.map(|s| s.to_string()),
+                        text: String::new(),
+                        inner: Vec::new(),
+                    });
                 }
                 other => out.push(other),
             },
             Some(mut state) => match event {
                 Event::End(TagEnd::Heading(_)) => {
-                    let rendered_level = (state.0 + HEADING_LEVEL_OFFSET).min(6);
-                    let base_id = slugify(&state.1);
+                    let rendered_level = (state.source_level + HEADING_LEVEL_OFFSET).min(6);
+                    let base_id = state.custom_id.unwrap_or_else(|| slugify(&state.text));
                     let id = Slug::new_raw(unique_id(&base_id, &mut used_ids));
                     toc.push(HeadingEntry {
                         level: rendered_level,
-                        text: state.1.clone(),
+                        text: state.text,
                         id: id.clone(),
                     });
                     out.push(Event::Html(
-                        format!("<h{} id=\"{id}\">", rendered_level).into(),
+                        format!("<h{} id=\"{}\">", rendered_level, escape_html(id.as_ref())).into(),
                     ));
-                    out.extend(state.2);
+                    out.extend(state.inner);
                     out.push(Event::Html(format!("</h{}>", rendered_level).into()));
                 }
                 other => {
                     // Accumulate text content for slug generation (strips inline-code backticks)
                     if let Event::Text(ref t) | Event::Code(ref t) = other {
-                        state.1.push_str(t);
+                        state.text.push_str(t);
                     }
-                    state.2.push(other);
+                    state.inner.push(other);
                     heading_buf = Some(state);
                 }
             },
@@ -91,7 +115,9 @@ mod tests {
     use super::*;
 
     fn render_with_anchors(input: &str) -> (String, Vec<HeadingEntry>) {
-        let events: Vec<_> = Parser::new_ext(input, Options::empty()).collect();
+        let mut opts = Options::empty();
+        opts.insert(Options::ENABLE_HEADING_ATTRIBUTES);
+        let events: Vec<_> = Parser::new_ext(input, opts).collect();
         let (events, toc) = inject_heading_ids(events);
         (crate::markdown::render_html(events), toc)
     }
@@ -178,6 +204,45 @@ mod tests {
     fn no_headings_produces_empty_toc() {
         let (_, toc) = render_with_anchors("Just a paragraph.\n");
         assert!(toc.is_empty());
+    }
+
+    #[test]
+    fn custom_id_overrides_slug() {
+        let (_, toc) = render_with_anchors("## Hello World {#greet}\n");
+        assert_eq!(toc[0].id, "greet");
+        assert_eq!(toc[0].text, "Hello World");
+    }
+
+    #[test]
+    fn custom_id_used_verbatim_not_slugified() {
+        // Custom IDs are trusted as-is: case, dots, underscores preserved.
+        let (_, toc) = render_with_anchors("## Section {#API_v2.1}\n");
+        assert_eq!(toc[0].id, "API_v2.1");
+    }
+
+    #[test]
+    fn duplicate_custom_ids_get_suffixed() {
+        let (_, toc) = render_with_anchors("## First {#same}\n\n## Second {#same}\n");
+        assert_eq!(toc[0].id, "same");
+        assert_eq!(toc[1].id, "same-2");
+    }
+
+    #[test]
+    fn custom_id_collides_with_auto_id() {
+        // Auto and custom IDs share one namespace, so a custom id matching
+        // an earlier heading's slug gets suffixed.
+        let (_, toc) = render_with_anchors("## intro\n\n## Other {#intro}\n");
+        assert_eq!(toc[0].id, "intro");
+        assert_eq!(toc[1].id, "intro-2");
+    }
+
+    #[test]
+    fn custom_id_html_escaped_in_output() {
+        // Defense in depth: even though pulldown-cmark won't produce
+        // exotic IDs through normal `{#…}` syntax, the renderer must not
+        // emit raw `"` or `<` into the attribute value.
+        let (html, _) = render_with_anchors("## Heading {#weird&id}\n");
+        assert!(html.contains(r#"id="weird&amp;id""#), "html was: {html}");
     }
 
     #[test]
