@@ -27,6 +27,36 @@ The pipe separates the target slug from the link label shown to the reader. Use 
 See the [[configuration|config reference]] for details.
 ```
 
+# Anchor links
+
+Target a heading on the destination page by appending `#section` after the slug:
+
+```
+[[configuration#authors]]
+[[configuration#authors|the authors section]]
+```
+
+The anchor text is slugified the same way as heading IDs (lowercased, non-alphanumerics replaced by `-`), so `[[configuration#Authors]]` and `[[configuration#authors]]` both resolve to the same fragment.
+
+A bare cross-page anchor renders as `Page Title > section` so the reader sees which page they're heading to. Pipe-alias for a cleaner label when you don't want that:
+
+| Source | Rendered text |
+|--------|---------------|
+| `[[configuration#authors]]` | `Configuration > authors` |
+| `[[configuration#authors\|the authors section]]` | `the authors section` |
+
+Anchor fragments are **not validated** against the destination page's headings — a missing anchor lands the reader at the top of the page, the same way any stale `#fragment` in an HTML link does. Only the slug portion has to resolve.
+
+## Same-page anchors
+
+Omit the slug to link within the current page:
+
+```
+[[#summary]]
+```
+
+Renders as `<a href="#summary">summary</a>`. Same-page anchors never count as broken links and never produce backlinks.
+
 # Resolution rules
 
 - The target is looked up by **filename stem** (Obsidian-style). The extension and directory are irrelevant.

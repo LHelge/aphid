@@ -784,11 +784,10 @@ mod tests {
     }
 
     fn site_with_author_toml(author_toml: &str) -> Site {
-        let config: Config = format!(
-            "title = \"T\"\nbase_url = \"http://x\"\n\n[[authors]]\n{author_toml}\n"
-        )
-        .parse()
-        .unwrap();
+        let config: Config =
+            format!("title = \"T\"\nbase_url = \"http://x\"\n\n[[authors]]\n{author_toml}\n")
+                .parse()
+                .unwrap();
         Site::from_parts(config, vec![], vec![], vec![]).unwrap()
     }
 

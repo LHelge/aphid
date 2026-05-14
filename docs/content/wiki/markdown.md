@@ -168,6 +168,8 @@ Cross-links to any other page by filename stem:
 ```markdown
 [[page-slug]]
 [[page-slug|Display text]]
+[[page-slug#section]]
+[[#same-page-section]]
 ```
 
 See [[wiki-links]] for full details.

@@ -172,4 +172,93 @@ mod tests {
         assert_eq!(rendered.toc[1].level, 3);
         assert!(rendered.html.contains("id=\"section-one\""));
     }
+
+    fn site_with_wiki_page(slug: &str, title: &str) -> Site {
+        use crate::content::WikiFrontmatter;
+        use crate::content::page::Page;
+        use std::path::PathBuf;
+
+        let config: crate::config::Config =
+            "title = \"T\"\nbase_url = \"http://x\"".parse().unwrap();
+        let page = Page {
+            slug: slug.into(),
+            body: String::new(),
+            path: PathBuf::from(format!("content/wiki/{slug}.md")),
+            frontmatter: WikiFrontmatter {
+                title: title.to_owned(),
+                category: None,
+                created: None,
+                updated: None,
+                tags: vec![],
+                draft: false,
+            },
+        };
+        Site::from_parts(config, vec![], vec![page], vec![]).unwrap()
+    }
+
+    #[test]
+    fn wiki_link_with_anchor_appends_fragment() {
+        let site = site_with_wiki_page("glossary", "Glossary");
+        let rendered = MarkdownRenderer::new(&site).render("See [[glossary#term]] for details.\n");
+        assert!(
+            rendered.html.contains(r#"href="/wiki/glossary/#term""#),
+            "html was: {}",
+            rendered.html
+        );
+        assert!(rendered.broken_wiki_links.is_empty());
+    }
+
+    #[test]
+    fn wiki_link_anchor_slugifies_to_match_headings() {
+        let site = site_with_wiki_page("glossary", "Glossary");
+        let rendered =
+            MarkdownRenderer::new(&site).render("See [[glossary#Hello World]] for details.\n");
+        assert!(
+            rendered
+                .html
+                .contains(r#"href="/wiki/glossary/#hello-world""#),
+            "html was: {}",
+            rendered.html
+        );
+    }
+
+    #[test]
+    fn wiki_link_anchor_default_display_includes_section() {
+        let site = site_with_wiki_page("glossary", "Glossary");
+        let rendered = MarkdownRenderer::new(&site).render("[[glossary#term]]\n");
+        // Bare cross-page anchor renders as "Page Title > section"
+        assert!(
+            rendered.html.contains("Glossary &gt; term"),
+            "html was: {}",
+            rendered.html
+        );
+    }
+
+    #[test]
+    fn wiki_link_anchor_pipe_alias_wins() {
+        let site = site_with_wiki_page("glossary", "Glossary");
+        let rendered = MarkdownRenderer::new(&site).render("[[glossary#term|the term itself]]\n");
+        assert!(rendered.html.contains(r#"href="/wiki/glossary/#term""#));
+        assert!(rendered.html.contains(">the term itself</a>"));
+    }
+
+    #[test]
+    fn same_page_anchor_link() {
+        let site = empty_site();
+        let rendered = MarkdownRenderer::new(&site).render("Jump to [[#summary]].\n");
+        assert!(
+            rendered.html.contains(r##"href="#summary""##),
+            "html was: {}",
+            rendered.html
+        );
+        assert!(rendered.broken_wiki_links.is_empty());
+    }
+
+    #[test]
+    fn broken_wiki_link_with_anchor_reports_full_target() {
+        let site = empty_site();
+        let rendered =
+            MarkdownRenderer::new(&site).render("See [[missing#section]] for details.\n");
+        assert_eq!(rendered.broken_wiki_links, vec!["missing#section"]);
+    }
 }
