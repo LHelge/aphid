@@ -38,6 +38,18 @@ Every heading automatically receives a slug-based `id` attribute for anchor link
 
 When two headings on the same page produce the same slug (e.g. two `# Examples` sections), the second gets `-2`, the third `-3`, and so on, so anchor links remain unique.
 
+## Custom heading IDs {#custom-ids}
+
+Override the auto-generated id by appending `{#custom-id}` to the heading. Useful when you want stable anchors that won't change if you rephrase the heading text:
+
+```markdown
+## Configuration reference {#config-ref}    → <h3 id="config-ref">
+```
+
+Custom ids are used verbatim — they're not lowercased or normalised, so `{#API_v2.1}` produces `id="API_v2.1"`. Custom and auto-generated ids share the same namespace: if a custom id collides with an earlier heading on the page, it gets the same `-2`, `-3`, … suffix.
+
+[[wiki-links]] can target either kind: `[[page#config-ref]]` resolves to a custom id, `[[page#configuration-reference]]` to the auto-generated slug.
+
 # Code blocks
 
 Fenced code blocks are syntax-highlighted using [syntect](https://github.com/trishume/syntect). The highlighter emits CSS classes (prefixed `hl-`) rather than inline styles, so syntax colors are fully controlled by the theme stylesheet. The default theme uses [Catppuccin Mocha](https://catppuccin.com/) colors. Specify a language identifier after the opening fence:
