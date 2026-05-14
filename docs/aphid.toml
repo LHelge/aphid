@@ -9,6 +9,7 @@ wiki_categories = ["Getting Started", "Content", "Customization", "Development"]
 
 [[authors]]
 name = "LHelge"
+link = "https://lhelge.se"
 email = "lhelge@lhelge.se"
 image = "authors/lhelge.png"
 

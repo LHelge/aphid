@@ -103,7 +103,7 @@ Universal page variables, plus:
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `author` | object | Author metadata resolved from config. Has `.name` (string), `.email` (string?), `.image` (string?). If the frontmatter author name matches a `[[authors]]` entry in `aphid.toml`, email and image are populated from config; otherwise only `.name` is set. |
+| `author` | object | Author metadata resolved from config. Has `.name` (string), `.link` (string?), `.image` (string?). If the frontmatter author name matches a `[[authors]]` entry in `aphid.toml`, `.link` and `.image` are populated from config; otherwise only `.name` is set. `.link` uses the author's `link` field if set, falling back to `mailto:{email}` when only `email` is configured. |
 | `image` | string? | Hero/headline image path or URL, from frontmatter |
 | `description` | string? | Short summary, from frontmatter |
 | `created` | string | Publication date, formatted `YYYY-MM-DD` |

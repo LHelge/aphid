@@ -12,12 +12,12 @@ use crate::markdown::{HeadingEntry, Rendered};
 /// Author metadata resolved from config, exposed to blog post templates.
 ///
 /// The frontmatter `author` string is looked up against `[[authors]]` in
-/// `aphid.toml`. If found, the full author record (email, image) is used;
+/// `aphid.toml`. If found, the full author record (link, image) is used;
 /// otherwise only the name survives.
 #[derive(Debug, Clone, Serialize)]
 pub struct AuthorContext {
     pub name: String,
-    pub email: Option<String>,
+    pub link: Option<String>,
     pub image: Option<String>,
 }
 
@@ -27,15 +27,19 @@ impl AuthorContext {
     /// with `/static/`.
     pub fn resolve(name: &str, site: &Site) -> Self {
         let author = site.config.authors.iter().find(|a| a.name == name);
+
         match author {
             Some(a) => Self {
                 name: a.name.clone(),
-                email: a.email.clone(),
+                link: a
+                    .link
+                    .clone()
+                    .or_else(|| a.email.as_ref().map(|email| format!("mailto:{email}"))),
                 image: a.image.as_ref().map(|img| resolve_image_path(img)),
             },
             None => Self {
                 name: name.to_owned(),
-                email: None,
+                link: None,
                 image: None,
             },
         }
@@ -777,5 +781,46 @@ mod tests {
         assert_eq!(p.next_url.as_deref(), Some("/tags/rust/page/2/"));
         let urls: Vec<_> = p.pages.iter().map(|l| l.url.as_str()).collect();
         assert_eq!(urls, vec!["/tags/rust/", "/tags/rust/page/2/"]);
+    }
+
+    fn site_with_author_toml(author_toml: &str) -> Site {
+        let config: Config = format!(
+            "title = \"T\"\nbase_url = \"http://x\"\n\n[[authors]]\n{author_toml}\n"
+        )
+        .parse()
+        .unwrap();
+        Site::from_parts(config, vec![], vec![], vec![]).unwrap()
+    }
+
+    #[test]
+    fn author_link_used_verbatim_when_set() {
+        let site = site_with_author_toml(
+            "name = \"Alice\"\nlink = \"https://alice.example.com\"\nemail = \"alice@example.com\"",
+        );
+        let ctx = AuthorContext::resolve("Alice", &site);
+        assert_eq!(ctx.link.as_deref(), Some("https://alice.example.com"));
+    }
+
+    #[test]
+    fn author_email_falls_back_to_mailto() {
+        let site = site_with_author_toml("name = \"Alice\"\nemail = \"alice@example.com\"");
+        let ctx = AuthorContext::resolve("Alice", &site);
+        assert_eq!(ctx.link.as_deref(), Some("mailto:alice@example.com"));
+    }
+
+    #[test]
+    fn author_with_no_link_or_email_has_none() {
+        let site = site_with_author_toml("name = \"Alice\"");
+        let ctx = AuthorContext::resolve("Alice", &site);
+        assert!(ctx.link.is_none());
+    }
+
+    #[test]
+    fn unknown_author_resolves_to_name_only() {
+        let site = site_with_author_toml("name = \"Alice\"\nemail = \"alice@example.com\"");
+        let ctx = AuthorContext::resolve("Bob", &site);
+        assert_eq!(ctx.name, "Bob");
+        assert!(ctx.link.is_none());
+        assert!(ctx.image.is_none());
     }
 }

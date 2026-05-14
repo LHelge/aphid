@@ -13,6 +13,7 @@ fn default_static_dir() -> PathBuf {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Author {
     pub name: String,
+    pub link: Option<String>,
     pub email: Option<String>,
     pub image: Option<String>,
 }
@@ -182,7 +183,7 @@ mod tests {
 
             [[authors]]
             name = "Alice"
-            email = "alice@example.com"
+            link = "mailto:alice@example.com"
 
             [[authors]]
             name = "Bob"
@@ -198,9 +199,12 @@ mod tests {
         assert_eq!(cfg.static_dir, PathBuf::from("assets"));
         assert_eq!(cfg.authors.len(), 2);
         assert_eq!(cfg.authors[0].name, "Alice");
-        assert_eq!(cfg.authors[0].email.as_deref(), Some("alice@example.com"));
+        assert_eq!(
+            cfg.authors[0].link.as_deref(),
+            Some("mailto:alice@example.com")
+        );
         assert_eq!(cfg.authors[1].name, "Bob");
-        assert!(cfg.authors[1].email.is_none());
+        assert!(cfg.authors[1].link.is_none());
         assert_eq!(cfg.socials.len(), 1);
         assert_eq!(cfg.socials[0].platform, "github");
         assert_eq!(cfg.feed_limit, 5);
