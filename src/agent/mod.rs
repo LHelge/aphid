@@ -39,9 +39,11 @@ impl AgentTool {
 
 /// Write the instruction files for `tool` into `dir`.
 ///
-/// Overwrites any existing files at the target paths — `aphid agent` is meant
-/// to be re-runnable after upgrading aphid so the bundled instructions stay
-/// in sync with the binary.
+/// Skill files are overwritten on every run — they're pure embedded reference
+/// content and should track the installed aphid version. The main instruction
+/// file (`CLAUDE.md`, `.github/copilot-instructions.md`, `AGENTS.md`) is
+/// preserved if it already exists, since users typically extend it with
+/// project-specific guidance; a warning is emitted in that case.
 pub fn init(tool: AgentTool, dir: &Path) -> Result<(), Error> {
     match tool {
         AgentTool::Claude => claude::write(dir),
@@ -57,12 +59,29 @@ pub(crate) const THEME_SKILL: &str = include_str!("templates/theme_skill.md");
 pub(crate) const CONTENT_DESCRIPTION: &str = "Reference for authoring aphid content. Use when writing or editing markdown files under content/blog/, content/wiki/, or content/pages/, or when configuring frontmatter or aphid.toml.";
 pub(crate) const THEME_DESCRIPTION: &str = "Reference for editing aphid themes. Use when modifying Tera templates under theme/templates/, designing layouts, working with template variables, or changing theme CSS and static assets.";
 
+/// Write `content` to `path`, creating parent directories as needed.
+/// Overwrites any existing file at that path.
 pub(crate) fn write_file(path: &Path, content: &str) -> Result<(), Error> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
     fs::write(path, content)?;
     Ok(())
+}
+
+/// Write `content` to `path` only if no file exists there. If one already
+/// does, leave it untouched and emit a warning — used for the main
+/// instruction file, which users are expected to extend with project-specific
+/// guidance.
+pub(crate) fn write_main_file(path: &Path, content: &str) -> Result<(), Error> {
+    if path.exists() {
+        tracing::warn!(
+            path = %path.display(),
+            "left existing main instruction file untouched; delete it to regenerate"
+        );
+        return Ok(());
+    }
+    write_file(path, content)
 }
 
 #[cfg(test)]
@@ -137,26 +156,49 @@ mod tests {
     }
 
     #[test]
-    fn overwrites_existing_files() {
+    fn main_file_preserved_when_present() {
         let tmp = tempfile::tempdir().unwrap();
-        fs::write(tmp.path().join("CLAUDE.md"), "stale").unwrap();
+        let user_main = "# my own CLAUDE.md\n\nProject-specific guidance.";
+        fs::write(tmp.path().join("CLAUDE.md"), user_main).unwrap();
 
         init(AgentTool::Claude, tmp.path()).unwrap();
 
         let body = fs::read_to_string(tmp.path().join("CLAUDE.md")).unwrap();
-        assert_ne!(body, "stale");
-        assert!(body.contains("aphid"));
+        assert_eq!(body, user_main, "main file must not be overwritten");
+        assert!(
+            tmp.path()
+                .join(".claude/skills/aphid-content/SKILL.md")
+                .exists(),
+            "skill files should still be written"
+        );
     }
 
     #[test]
-    fn re_running_is_idempotent() {
+    fn skill_files_are_overwritten() {
+        let tmp = tempfile::tempdir().unwrap();
+        let skill_path = tmp.path().join(".claude/skills/aphid-content/SKILL.md");
+        fs::create_dir_all(skill_path.parent().unwrap()).unwrap();
+        fs::write(&skill_path, "stale").unwrap();
+
+        init(AgentTool::Claude, tmp.path()).unwrap();
+
+        let body = fs::read_to_string(&skill_path).unwrap();
+        assert_ne!(body, "stale");
+        assert!(body.contains("aphid-content"));
+    }
+
+    #[test]
+    fn re_running_keeps_main_file_and_refreshes_skills() {
         let tmp = tempfile::tempdir().unwrap();
         init(AgentTool::Codex, tmp.path()).unwrap();
-        let first = fs::read_to_string(tmp.path().join("AGENTS.md")).unwrap();
+        let main_before = fs::read_to_string(tmp.path().join("AGENTS.md")).unwrap();
+        fs::write(tmp.path().join(".agents/aphid-content.md"), "stale").unwrap();
 
         init(AgentTool::Codex, tmp.path()).unwrap();
-        let second = fs::read_to_string(tmp.path().join("AGENTS.md")).unwrap();
 
-        assert_eq!(first, second);
+        let main_after = fs::read_to_string(tmp.path().join("AGENTS.md")).unwrap();
+        let skill_after = fs::read_to_string(tmp.path().join(".agents/aphid-content.md")).unwrap();
+        assert_eq!(main_before, main_after);
+        assert_ne!(skill_after, "stale");
     }
 }
