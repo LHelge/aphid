@@ -14,11 +14,21 @@ pub use relative_urls::rewrite_relative_urls;
 pub use rendered::{BrokenWikiLink, DiagnosticSource, Diagnostics, RenderedSite};
 pub use wikilinks::{WikiLinkRef, extract_wiki_links, rewrite_wiki_links};
 
+use std::sync::LazyLock;
+
 use rayon::prelude::*;
+use regex::Regex;
 
 use pulldown_cmark::{Options, Parser, html};
 
+use crate::config::Config;
 use crate::content::Site;
+
+/// Matches `href="…"` and `src="…"` attributes whose value is a root-relative
+/// path (starts with `/`). Used to rewrite in-HTML URLs to absolute form for
+/// contexts that fetch out of site scope (RSS/Atom feeds).
+static ROOT_RELATIVE_ATTR_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(href|src)="(/[^"]*)"#).unwrap());
 
 pub(crate) fn render_html(events: Vec<pulldown_cmark::Event<'_>>) -> String {
     let mut output = String::new();
@@ -55,6 +65,21 @@ pub struct Rendered {
     pub contains_mermaid: bool,
 }
 
+impl Rendered {
+    /// Return [`Rendered::html`] with every root-relative `href` / `src`
+    /// attribute rewritten to a fully-qualified URL against the site
+    /// `base_url`. Needed by RSS/Atom feeds, which crawlers fetch out of
+    /// site context, so a `<a href="/wiki/foo/">` would otherwise have no
+    /// resolvable origin.
+    pub fn html_with_absolute_urls(&self, config: &Config) -> String {
+        ROOT_RELATIVE_ATTR_RE
+            .replace_all(&self.html, |caps: &regex::Captures| {
+                format!("{}=\"{}\"", &caps[1], config.absolute_url(&caps[2]))
+            })
+            .into_owned()
+    }
+}
+
 /// Markdown → HTML pipeline scoped to a [`Site`]: parses the body,
 /// rewrites wiki-links against the site's slug index, injects heading
 /// anchors, and runs syntax highlighting.
@@ -79,7 +104,7 @@ impl<'a> MarkdownRenderer<'a> {
 
         let events = rewrite_relative_urls(events);
         let (events, broken_wiki_links) = rewrite_wiki_links(events, self.site);
-        let events = rewrite_external_links(events);
+        let events = rewrite_external_links(events, &self.site.config.base_url);
         let events = rewrite_alerts(events);
         let (events, toc) = inject_heading_ids(events);
         let (events, contains_mermaid) = self.highlighter.transform(events);
@@ -141,6 +166,36 @@ mod tests {
         let config: crate::config::Config =
             "title = \"T\"\nbase_url = \"http://x\"".parse().unwrap();
         Site::from_parts(config, vec![], vec![], vec![]).unwrap()
+    }
+
+    fn rendered_with_html(html: &str) -> Rendered {
+        Rendered {
+            html: html.to_owned(),
+            toc: vec![],
+            broken_wiki_links: vec![],
+            contains_mermaid: false,
+        }
+    }
+
+    #[test]
+    fn html_with_absolute_urls_rewrites_root_relative_attrs() {
+        let cfg: crate::config::Config = "title = \"T\"\nbase_url = \"https://example.com\""
+            .parse()
+            .unwrap();
+        let r = rendered_with_html(r#"<a href="/wiki/foo/">x</a><img src="/static/i.png">"#);
+        let out = r.html_with_absolute_urls(&cfg);
+        assert!(out.contains(r#"href="https://example.com/wiki/foo/""#));
+        assert!(out.contains(r#"src="https://example.com/static/i.png""#));
+    }
+
+    #[test]
+    fn html_with_absolute_urls_passes_through_absolute_attrs() {
+        let cfg: crate::config::Config = "title = \"T\"\nbase_url = \"https://example.com\""
+            .parse()
+            .unwrap();
+        let html = r#"<a href="https://other.com/page">link</a>"#;
+        let out = rendered_with_html(html).html_with_absolute_urls(&cfg);
+        assert_eq!(out, html);
     }
 
     #[test]

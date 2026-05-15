@@ -24,7 +24,7 @@
   <meta property="og:site_name" content="{{ site_title }}">
   <meta property="og:title" content="{{ meta_title }}">
   {% if meta_desc %}<meta property="og:description" content="{{ meta_desc }}">{% endif %}
-  {% if url is defined %}<meta property="og:url" content="{{ base_url ~ url | safe }}">{% endif %}
+  {% if canonical_url is defined %}<meta property="og:url" content="{{ canonical_url | safe }}">{% endif %}
   {% if meta_image %}<meta property="og:image" content="{{ meta_image | safe }}">{% endif %}
 
   <meta name="twitter:card" content="{% if meta_image %}summary_large_image{% else %}summary{% endif %}">

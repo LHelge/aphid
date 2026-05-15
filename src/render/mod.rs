@@ -181,7 +181,7 @@ impl<'a> Renderer<'a> {
             .pages()
             .par_bridge()
             .map(|(page, r)| {
-                let ctx = StandalonePageContext::from_page(page, r, site_ctx);
+                let ctx = StandalonePageContext::from_page(page, r, rendered.site(), site_ctx);
                 let url = page.url_path();
                 let html = self.render_template("page.html", &ctx)?;
                 Ok((url, html))
@@ -390,7 +390,6 @@ mod tests {
     fn site_ctx_for_test() -> SiteContext {
         SiteContext {
             site_title: "Test".into(),
-            base_url: "http://localhost".into(),
             site_description: None,
             social_image_url: None,
             version: "0.0.0".into(),

@@ -48,25 +48,6 @@ impl AuthorContext {
     }
 }
 
-/// Join a root-relative or already-absolute URL with the site `base_url`
-/// to produce a fully qualified URL — needed for OpenGraph / Twitter
-/// card meta tags, which crawlers fetch out of site context.
-///
-/// `base_url` is expected to be normalized (no trailing slash). The
-/// input `path` must be either an absolute `http(s)://` URL (used
-/// verbatim) or a root-relative path beginning with `/`; bare paths
-/// are joined as-is with a separator, but the convention across aphid
-/// is to always write them root-relative (e.g. `/static/foo.png`).
-fn absolutize_url(path: &str, base_url: &str) -> String {
-    if path.starts_with("http://") || path.starts_with("https://") {
-        path.to_owned()
-    } else if path.starts_with('/') {
-        format!("{base_url}{path}")
-    } else {
-        format!("{base_url}/{path}")
-    }
-}
-
 /// A single nav entry for standalone pages, available to all templates.
 #[derive(Debug, Clone, Serialize)]
 pub struct NavEntry {
@@ -451,9 +432,6 @@ pub struct NotFoundContext {
 #[derive(Debug, Clone, Serialize)]
 pub struct SiteContext {
     pub site_title: String,
-    /// Site `base_url` with any trailing slash stripped so templates can
-    /// safely concatenate `{{ base_url }}{{ url }}` for canonical URLs.
-    pub base_url: String,
     /// Site-wide description from config, exposed for SEO `<meta>` tags
     /// and as the OpenGraph description fallback on pages without their
     /// own.
@@ -479,14 +457,12 @@ impl SiteContext {
         pages: &[Page<PageFrontmatter>],
         favicon: Option<&FaviconSet>,
     ) -> Self {
-        let base_url = config.normalized_base_url().to_owned();
         let social_image_url = config
             .social_image
             .as_deref()
-            .map(|p| absolutize_url(p, &base_url));
+            .map(|p| config.absolute_url(p).into());
         Self {
             site_title: config.title.clone(),
-            base_url,
             site_description: config.description.clone(),
             social_image_url,
             version: env!("CARGO_PKG_VERSION").to_string(),
@@ -508,7 +484,12 @@ pub struct StandalonePageContext {
     #[serde(flatten)]
     pub site: SiteContext,
     pub title: String,
+    /// Root-relative URL of this page (e.g. `/blog/my-post/`).
     pub url: String,
+    /// Absolute URL of this page (`base_url` joined with `url`). Pre-built
+    /// so templates never have to assemble canonical URLs from pieces —
+    /// they just emit `{{ canonical_url }}` for OpenGraph tags and similar.
+    pub canonical_url: String,
     pub content: String,
     pub toc: Vec<TocEntry>,
     pub contains_mermaid: bool,
@@ -518,12 +499,15 @@ impl StandalonePageContext {
     pub fn from_page(
         page: &Page<PageFrontmatter>,
         rendered: &Rendered,
+        site: &Site,
         site_ctx: &SiteContext,
     ) -> Self {
+        let url = page.url_path();
         Self {
             site: site_ctx.clone(),
             title: page.frontmatter.title.clone(),
-            url: page.url_path(),
+            canonical_url: site.config.absolute_url(&url).into(),
+            url,
             content: rendered.html.clone(),
             toc: TocEntry::from_headings(&rendered.toc),
             contains_mermaid: rendered.contains_mermaid,
@@ -559,10 +543,12 @@ impl WikiPageContext {
             .into_iter()
             .map(BacklinkEntry::from_view)
             .collect();
+        let url = page.url_path();
         let base = StandalonePageContext {
             site: site_ctx.clone(),
             title: page.frontmatter.title.clone(),
-            url: page.url_path(),
+            canonical_url: site.config.absolute_url(&url).into(),
+            url,
             content: rendered.html.clone(),
             toc: TocEntry::from_headings(&rendered.toc),
             contains_mermaid: rendered.contains_mermaid,
@@ -611,12 +597,14 @@ impl BlogPostContext {
             .frontmatter
             .image
             .as_deref()
-            .map(|img| absolutize_url(img, &site_ctx.base_url))
+            .map(|img| site.config.absolute_url(img).into())
             .or_else(|| site_ctx.social_image_url.clone());
+        let url = page.url_path();
         let base = StandalonePageContext {
             site: site_ctx.clone(),
             title: page.frontmatter.title.clone(),
-            url: page.url_path(),
+            canonical_url: site.config.absolute_url(&url).into(),
+            url,
             content: rendered.html.clone(),
             toc: TocEntry::from_headings(&rendered.toc),
             contains_mermaid: rendered.contains_mermaid,

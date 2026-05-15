@@ -1,10 +1,8 @@
 use std::io::Cursor;
-use std::sync::LazyLock;
 
 use chrono::NaiveDate;
 use quick_xml::Writer;
 use quick_xml::events::{BytesDecl, BytesText};
-use regex::Regex;
 
 use super::RootArtifact;
 use crate::content::Site;
@@ -14,17 +12,6 @@ use crate::markdown::{Rendered, RenderedSite};
 
 const ATOM_NS: &str = "http://www.w3.org/2005/Atom";
 const DC_NS: &str = "http://purl.org/dc/elements/1.1/";
-
-static RELATIVE_URL_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r#"(href|src)="(/[^"]*)"#).unwrap());
-
-fn absolutize_urls(html: &str, base: &str) -> String {
-    RELATIVE_URL_RE
-        .replace_all(html, |caps: &regex::Captures| {
-            format!("{}=\"{}{}\"", &caps[1], base, &caps[2])
-        })
-        .into_owned()
-}
 
 /// Convert a `NaiveDate` to midnight UTC and format as RFC 3339 (Atom).
 fn rfc3339(date: NaiveDate) -> String {
@@ -82,7 +69,8 @@ impl RootArtifact for RssFeed {
 }
 
 fn write_atom(site: &Site, entries: &[(&Page<BlogFrontmatter>, &Rendered)]) -> Vec<u8> {
-    let base = site.config.normalized_base_url();
+    let feed_url: String = site.config.absolute_url("/feed.xml").into();
+    let site_url: String = site.config.absolute_url("/").into();
     let mut writer = Writer::new_with_indent(Cursor::new(Vec::new()), b' ', 2);
 
     writer
@@ -101,19 +89,19 @@ fn write_atom(site: &Site, entries: &[(&Page<BlogFrontmatter>, &Rendered)]) -> V
                 .write_text_content(BytesText::new(&site.config.title))?;
 
             w.create_element("link")
-                .with_attribute(("href", format!("{base}/feed.xml").as_str()))
+                .with_attribute(("href", feed_url.as_str()))
                 .with_attribute(("rel", "self"))
                 .with_attribute(("type", "application/atom+xml"))
                 .write_empty()?;
 
             w.create_element("link")
-                .with_attribute(("href", format!("{base}/").as_str()))
+                .with_attribute(("href", site_url.as_str()))
                 .with_attribute(("rel", "alternate"))
                 .with_attribute(("type", "text/html"))
                 .write_empty()?;
 
             w.create_element("id")
-                .write_text_content(BytesText::new(&format!("{base}/")))?;
+                .write_text_content(BytesText::new(&site_url))?;
 
             if let Some((post, _)) = entries.first() {
                 let date = post.frontmatter.updated.unwrap_or(post.frontmatter.created);
@@ -127,9 +115,12 @@ fn write_atom(site: &Site, entries: &[(&Page<BlogFrontmatter>, &Rendered)]) -> V
             }
 
             for (post, rendered) in entries {
-                let url = format!("{base}{}", PageKind::Blog.url_path(&post.slug));
+                let url: String = site
+                    .config
+                    .absolute_url(&PageKind::Blog.url_path(&post.slug))
+                    .into();
                 let updated = post.frontmatter.updated.unwrap_or(post.frontmatter.created);
-                let content = absolutize_urls(&rendered.html, base);
+                let content = rendered.html_with_absolute_urls(&site.config);
 
                 w.create_element("entry").write_inner_content(|w| {
                     w.create_element("title")
@@ -186,7 +177,8 @@ fn write_atom(site: &Site, entries: &[(&Page<BlogFrontmatter>, &Rendered)]) -> V
 }
 
 fn write_rss(site: &Site, entries: &[(&Page<BlogFrontmatter>, &Rendered)]) -> Vec<u8> {
-    let base = site.config.normalized_base_url();
+    let feed_url: String = site.config.absolute_url("/rss.xml").into();
+    let site_url: String = site.config.absolute_url("/").into();
     let mut writer = Writer::new_with_indent(Cursor::new(Vec::new()), b' ', 2);
 
     writer
@@ -208,7 +200,7 @@ fn write_rss(site: &Site, entries: &[(&Page<BlogFrontmatter>, &Rendered)]) -> Ve
                     .write_text_content(BytesText::new(&site.config.title))?;
 
                 w.create_element("link")
-                    .write_text_content(BytesText::new(&format!("{base}/")))?;
+                    .write_text_content(BytesText::new(&site_url))?;
 
                 let desc = site
                     .config
@@ -219,7 +211,7 @@ fn write_rss(site: &Site, entries: &[(&Page<BlogFrontmatter>, &Rendered)]) -> Ve
                     .write_text_content(BytesText::new(desc))?;
 
                 w.create_element("atom:link")
-                    .with_attribute(("href", format!("{base}/rss.xml").as_str()))
+                    .with_attribute(("href", feed_url.as_str()))
                     .with_attribute(("rel", "self"))
                     .with_attribute(("type", "application/rss+xml"))
                     .write_empty()?;
@@ -231,8 +223,11 @@ fn write_rss(site: &Site, entries: &[(&Page<BlogFrontmatter>, &Rendered)]) -> Ve
                 }
 
                 for (post, rendered) in entries {
-                    let url = format!("{base}{}", PageKind::Blog.url_path(&post.slug));
-                    let content = absolutize_urls(&rendered.html, base);
+                    let url: String = site
+                        .config
+                        .absolute_url(&PageKind::Blog.url_path(&post.slug))
+                        .into();
+                    let content = rendered.html_with_absolute_urls(&site.config);
 
                     w.create_element("item").write_inner_content(|w| {
                         w.create_element("title")
@@ -542,12 +537,5 @@ mod tests {
         let rss = String::from_utf8(RssFeed.render(&rendered)).unwrap();
         assert!(rss.contains("https://example.com/wiki/foo/"));
         assert!(rss.contains("https://example.com/static/img.png"));
-    }
-
-    #[test]
-    fn does_not_modify_absolute_urls() {
-        let html = r#"<a href="https://other.com/page">link</a>"#;
-        let result = absolutize_urls(html, "https://example.com");
-        assert_eq!(result, html);
     }
 }
