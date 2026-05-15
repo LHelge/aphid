@@ -115,7 +115,7 @@ For each tool, two scoped skills are written alongside the main instruction file
 | `copilot` | `.github/copilot-instructions.md`, `.github/instructions/aphid-content.instructions.md`, `.github/instructions/aphid-theme.instructions.md` |
 | `codex` | `AGENTS.md`, `.agents/aphid-content.md`, `.agents/aphid-theme.md` |
 
-Existing files at the target paths are overwritten — re-run after upgrading aphid to refresh the embedded instructions. Any local edits you have made will be lost, so keep project-specific guidance in a separate file.
+Re-runnable after upgrading aphid: the **skill files are always overwritten** so they track the installed aphid version, while the **main instruction file** (`CLAUDE.md`, `.github/copilot-instructions.md`, or `AGENTS.md`) is preserved if it already exists — a warning is logged in that case. This lets you extend the main file with project-specific guidance without having it clobbered on re-run; delete the main file first if you want a clean regeneration.
 
 The same logic is reachable from `aphid init --agent <TOOL>` and `aphid new <name> --agent <TOOL>`, so first-time setup is a single command.
 
