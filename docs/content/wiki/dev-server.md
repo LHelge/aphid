@@ -3,6 +3,7 @@ title: Dev server
 category: Getting Started
 tags:
   - reference
+  - cli
 ---
 
 `aphid serve` runs a local development server with file watching and live reload — the recommended way to write content. Bare `aphid` is shorthand for `aphid serve --port 3000`.

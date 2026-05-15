@@ -3,6 +3,7 @@ title: CLI reference
 category: Getting Started
 tags:
   - reference
+  - cli
 ---
 
 The `aphid` binary has several subcommands and a small set of flags. Running `aphid` with no subcommand starts the dev server on port 3000 — the most common case while writing content.

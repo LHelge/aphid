@@ -2,7 +2,8 @@
 title: Deployment
 category: Getting Started
 tags:
-  - reference
+  - guide
+  - deployment
 ---
 
 `aphid build` writes a self-contained directory of HTML and static files (default: `dist/`). Pass `--output <dir>` to change the location. Any static host can serve it.

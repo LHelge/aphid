@@ -3,6 +3,8 @@ title: Mermaid diagrams
 category: Content
 tags:
   - reference
+  - content
+  - markdown
 ---
 
 [Mermaid](https://mermaid.js.org/) lets you describe diagrams in plain text and renders them as SVG in the browser. `aphid` recognises fenced code blocks tagged `mermaid` and emits them as `<pre class="mermaid">` elements; the bundled runtime turns them into diagrams once the page loads.

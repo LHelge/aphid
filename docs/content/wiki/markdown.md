@@ -3,6 +3,8 @@ title: Markdown
 category: Content
 tags:
   - reference
+  - content
+  - markdown
 ---
 
 aphid uses [pulldown-cmark](https://github.com/raphlinus/pulldown-cmark) to render Markdown, with a small set of extensions enabled on top of standard [CommonMark](https://commonmark.org/).

@@ -2,7 +2,8 @@
 title: Installation
 category: Getting Started
 tags:
-  - reference
+  - guide
+  - deployment
 ---
 
 # Requirements
