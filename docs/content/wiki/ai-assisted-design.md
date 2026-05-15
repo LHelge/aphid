@@ -37,6 +37,7 @@ mytheme/
     page.html
     tag.html
     tags_index.html
+    pagination.html
     404.html
   static/
     css/
@@ -71,10 +72,14 @@ The standard pattern is a `base.html` layout that all other templates extend.
 | Variable | Type | Description |
 |----------|------|-------------|
 | `site_title` | string | Site title from `aphid.toml` |
-| `base_url` | string | Canonical root URL from `aphid.toml` |
+| `site_description` | string? | Site description from `aphid.toml` |
+| `social_image_url` | string? | Default OpenGraph image URL |
 | `version` | string | The aphid binary version |
 | `nav_pages` | list | Standalone pages sorted by `order`; each has `title` and `url` |
 | `socials` | list | Social links from `aphid.toml`; each has `platform` and `url` |
+| `favicon_tags` | string | Pre-rendered `<link rel="icon">` tags |
+| `feed_atom_url` | string | URL for the Atom feed |
+| `feed_rss_url` | string | URL for the RSS feed |
 
 ## base.html
 
@@ -91,6 +96,7 @@ Example skeleton:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block page_title %}{{ site_title }}{% endblock %}</title>
   <link rel="stylesheet" href="/static/css/theme.css">
+  {{ favicon_tags | safe }}
 </head>
 <body>
   <nav>
@@ -119,7 +125,9 @@ Renders the site root (`/index.html`).
 | Variable | Type | Description |
 |----------|------|-------------|
 | `posts` | list | All blog posts (see post entry shape below) |
-| `home` | object? | Present when `content/home.md` exists; has `content` (rendered HTML — use `| safe`) |
+| `home` | object? | Present when `content/home.md` exists; has `content` (rendered HTML — use `\| safe`) |
+| `contains_mermaid` | bool | True if any rendered block uses Mermaid |
+| `popular_tags` | list | All tags across blog and wiki, sorted by descending count then ascending name. Each entry has `name`, `slug`, `count`. Counts match `/tags/`. Slice with `\| slice(end=N)` for top-N. |
 
 ## blog_post.html
 
@@ -129,14 +137,20 @@ Renders a single blog post.
 |----------|------|-------------|
 | `title` | string | Post title |
 | `url` | string | Clean URL, e.g. `/blog/my-post/` |
-| `content` | string | Rendered HTML body — always use `| safe` |
+| `canonical_url` | string | Absolute canonical URL |
+| `content` | string | Rendered HTML body — always use `\| safe` |
 | `toc` | list | Heading entries; each has `level` (int), `text` (string), `id` (string) |
-| `backlinks` | list | Pages linking here; each has `title` and `url` |
-| `author` | string? | Author name |
+| `author` | object | `{ name, link?, image? }` |
 | `image` | string? | Hero image path or URL |
-| `created` | string? | Publication date `YYYY-MM-DD` |
+| `og_image` | string? | Absolute social-share image URL |
+| `description` | string? | Short summary |
+| `created` | string | Publication date `YYYY-MM-DD` |
 | `updated` | string? | Last-edited date |
+| `reading_time_minutes` | int | Estimated read time |
 | `tags` | list | Each has `name` and `slug` |
+| `newer_post` | object? | `{ title, url }` for navigation |
+| `older_post` | object? | `{ title, url }` for navigation |
+| `contains_mermaid` | bool | |
 
 ## blog_index.html
 
@@ -144,7 +158,8 @@ Renders the blog listing at `/blog/`.
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `posts` | list | All blog posts (see post entry shape below) |
+| `posts` | list | Posts on this page (see post entry shape below) |
+| `pagination` | object? | Pagination state |
 
 ## Post entry shape (used in home.html, blog_index.html, tag.html)
 
@@ -155,19 +170,21 @@ Renders the blog listing at `/blog/`.
 | `created` | string? | Publication date |
 | `image` | string? | Hero image path or URL |
 | `description` | string? | Short summary from frontmatter |
+| `reading_time_minutes` | int | Reading-time estimate (rounded up, minimum 1) — same value as on the post template |
 | `tags` | list | Each has `name` and `slug` |
 
 ## wiki_page.html
 
-Renders a single wiki page. Has the same variables as `blog_post.html`, plus:
+Renders a single wiki page. Has many of the same variables as `blog_post.html`, plus:
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `category` | string? | Category name from frontmatter |
-| `wiki_categories` | list | All wiki pages grouped by category — for a sidebar. Each entry has `name` (string or null) and `pages` (list of `{title, url}`). Named categories appear first; uncategorised pages are grouped under `name = null` at the end. |
+| `category` | string | Category name. Falls back to `wiki_default_category` (default `"Other"`) when frontmatter omits it, so always non-empty |
+| `backlinks` | list | Pages linking here; each has `title` and `url` |
+| `wiki_categories` | list | All wiki pages grouped by category — for a sidebar. Each entry has `name` (string) and `pages` (list of `{title, url}`). Named categories listed in `wiki_categories` config appear first, then alphabetical; the default catch-all group sorts last. |
 
-Note: `author` and `image` are always absent on wiki pages. `created`, `updated`, and `tags`
-are present only if set in frontmatter.
+`author`, `image` are always absent on wiki pages. `created`, `updated`, `tags` are present
+only if set in frontmatter.
 
 ## wiki_index.html
 
@@ -175,7 +192,7 @@ Renders the wiki listing at `/wiki/`.
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `categories` | list | Same shape as `wiki_categories` on wiki_page.html |
+| `categories` | list | Same shape as `wiki_categories` on `wiki_page.html` |
 
 ## page.html
 
@@ -190,7 +207,10 @@ Renders a single tag page.
 |----------|------|-------------|
 | `tag` | string | Tag display name |
 | `tag_slug` | string | URL-safe slug |
-| `posts` | list | Tagged posts; each has `title`, `url`, and `created?` |
+| `blog_posts` | list | All blog posts with this tag (post entry shape). Guard with a length check — may be empty |
+| `wiki_pages` | list | All wiki pages with this tag. Same shape. Also may be empty |
+
+Tag pages are not paginated.
 
 ## tags_index.html
 
@@ -200,9 +220,31 @@ Renders the tag listing at `/tags/`.
 |----------|------|-------------|
 | `tags` | list | All tags; each has `name`, `slug`, and `count` |
 
+## pagination.html
+
+Included by listing templates (`blog_index.html`). Receives the surrounding template's
+`pagination` object:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `current` | int | 1-indexed current page number |
+| `total` | int | Total number of pages |
+| `prev_url` | string? | URL of the previous page, `null` on page 1 |
+| `next_url` | string? | URL of the next page, `null` on the last page |
+| `pages` | list | Every page — each entry has `n` (int) and `url` (string) for numeric nav |
+
+`pagination` is `null` when the entire listing fits on one page; templates should guard
+the include with `{% if pagination %}`. Tag pages are not paginated — `tag.html` never
+receives a `pagination` variable.
+
 ## 404.html
 
-Error page. No additional variables beyond the global ones.
+Error page.
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `not_found` | object? | Present when `content/404.md` exists; has `content` (use `\| safe`) |
+| `contains_mermaid` | bool | |
 
 ## Static files and CSS
 
@@ -217,8 +259,8 @@ If the user's `static_dir` has a file with the same name, the user's version win
 
 ## Syntax highlighting CSS
 
-Code blocks use CSS classes prefixed `hl-`. The theme stylesheet must define colors for these
-classes. Key token classes:
+Code blocks use CSS classes prefixed `hl-`. The theme stylesheet must define colors for
+these classes. Key token classes:
 
 - `hl-keyword` — language keywords (`fn`, `if`, `return`)
 - `hl-string` — string literals
@@ -233,20 +275,57 @@ classes. Key token classes:
 - `hl-tag` — HTML/XML tags
 - `hl-entity` — entities and special names
 
-Wrap code blocks in a container with `overflow-x: auto` for horizontal scrolling.
-Use a monospace font and a background color that contrasts with the page.
+Wrap code blocks in a container with `overflow-x: auto` for horizontal scrolling. Use a
+monospace font and a background color that contrasts with the page.
+
+## Mermaid diagrams
+
+When `contains_mermaid` is true, the template should load `/static/js/mermaid.min.js`
+(bundled by aphid) and initialise it. The renderer wraps Mermaid blocks in
+`<pre class="mermaid">`, which Mermaid picks up on initialise. Gate the script tag on
+`contains_mermaid` so pages without diagrams don't pay the download cost:
+
+```html
+{% if contains_mermaid %}
+<script src="/static/js/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true });</script>
+{% endif %}
+```
+
+## Social meta tags
+
+`base.html` is expected to emit OpenGraph and Twitter card meta tags in the `<head>` of
+every page. Two Tera blocks are reserved for per-template overrides:
+
+| Block | Default | Override on |
+|-------|---------|-------------|
+| `og_type` | `"website"` | `blog_post.html` → `"article"` |
+| `article_meta` | empty | `blog_post.html` → `article:published_time`, `article:modified_time`, `article:author`, `article:tag` |
+
+Tag content comes from these context fields, with fallbacks:
+
+- `og:title` / `twitter:title` — page `title`, falling back to `site_title`
+- `og:description` / `twitter:description` / `<meta name="description">` — page `description`, falling back to `site_description`
+- `og:url` — page `canonical_url` (only emitted when the page exposes one)
+- `og:image` / `twitter:image` — blog post `og_image`, falling back to `social_image_url`
+- `twitter:card` — `summary_large_image` when an image is set, `summary` otherwise
+- `og:site_name` — `site_title`
+
+Pages without an image still produce valid tags — they just drop the `og:image` /
+`twitter:image` lines and downgrade the card type to `summary`.
 
 ## Design guidelines
 
-- The page title is `<h1>`, body headings start at `<h2>` (the markdown pipeline shifts levels)
-- `content` is rendered HTML — use `{{ content | safe }}`
-- `toc` entries can build a table of contents sidebar or in-page nav
-- `backlinks` are most useful on wiki pages — show them in a footer or sidebar section
-- `wiki_categories` on wiki_page.html enables a sidebar showing all wiki pages grouped by
-  category, with the current page highlighted (compare `page.url == url`)
-- Test the theme against pages with: no image, no tags, no TOC, very long content, and many
-  backlinks
-- Ensure the layout is responsive — test at mobile, tablet, and desktop widths
+- The page title is `<h1>`; body headings start at `<h2>` (the markdown pipeline shifts
+  heading levels up by one).
+- `content` is rendered HTML — use `{{ content | safe }}`.
+- `toc` entries can build a table of contents sidebar or in-page nav.
+- `backlinks` are most useful on wiki pages — show them in a footer or sidebar section.
+- `wiki_categories` on `wiki_page.html` enables a sidebar showing all wiki pages grouped by
+  category, with the current page highlighted (compare `page.url == url`).
+- Test the theme against pages with: no image, no tags, no TOC, very long content, many
+  backlinks, and the 404 page.
+- Ensure the layout is responsive — test at mobile, tablet, and desktop widths.
 ````
 
 See also: [[themes]], [[markdown]], [[ai-assisted-writing]].
