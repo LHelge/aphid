@@ -7,6 +7,9 @@ tags:
 
 If you use an AI coding agent to help write content — whether that is GitHub Copilot, Claude Code, Cursor, Windsurf, or another tool — you can improve the results by giving the agent context about how aphid sites work. This page provides a ready-made instruction block you can drop into your project.
 
+> [!TIP]
+> Run `aphid agent claude` (or `copilot`, `codex`) to write these files for you in the right location with the right frontmatter. See [[cli#aphid-agent]] for the full description.
+
 Most agent systems support some form of project-level instructions: a markdown file in the repository that the agent reads automatically. The exact file and location varies:
 
 | Tool | File | Location |

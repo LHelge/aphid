@@ -1,3 +1,4 @@
+use aphid::agent::AgentTool;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -26,11 +27,17 @@ pub enum Command {
     New {
         /// Name of the directory to create.
         name: String,
+        /// Also write AI-agent instruction files. Omit the value for a generic AGENTS.md.
+        #[arg(long, value_name = "TOOL", num_args = 0..=1, default_missing_value = "codex")]
+        agent: Option<AgentTool>,
     },
     /// Initialize an aphid site in the current directory.
     Init {
         /// Directory to initialize (defaults to current directory).
         path: Option<PathBuf>,
+        /// Also write AI-agent instruction files. Omit the value for a generic AGENTS.md.
+        #[arg(long, value_name = "TOOL", num_args = 0..=1, default_missing_value = "codex")]
+        agent: Option<AgentTool>,
     },
     /// Manage blog posts.
     Blog {
@@ -46,6 +53,15 @@ pub enum Command {
     Page {
         #[command(subcommand)]
         action: PageAction,
+    },
+    /// Write AI-agent instruction files for this site.
+    ///
+    /// Omit the tool argument for a generic AGENTS.md — recognised by Codex, Aider,
+    /// Goose, and current Cursor.
+    Agent {
+        /// Target agent.
+        #[arg(default_value = "codex")]
+        tool: AgentTool,
     },
 }
 

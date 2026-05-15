@@ -147,3 +147,15 @@ The wiki at `docs/content/wiki/` is the user-facing reference for aphid. **Keep 
 - Changes to the install or build process → [[installation]]
 
 If a change doesn't fit an existing page, add a new one.
+
+## Agent instruction templates
+
+`src/agent/templates/{main_instructions,content_skill,theme_skill}.md` are embedded into the binary via `include_str!()` and shipped by `aphid agent <tool>` (and `aphid init --agent`, `aphid new --agent`). They are the on-disk reference an AI coding agent sees when working inside a generated site.
+
+**Whenever you change a user-facing API, update the relevant template too:**
+
+- New / changed frontmatter field, `aphid.toml` field, wiki-link syntax, or markdown feature → `content_skill.md`
+- New / changed template variable, theme template, or static-asset convention → `theme_skill.md`
+- New / changed CLI command or repo layout → `main_instructions.md`
+
+These templates duplicate prose from `docs/content/wiki/ai-assisted-{writing,design}.md` — keep both in sync when editing either.

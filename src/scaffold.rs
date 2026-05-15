@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use chrono::Local;
 
 use crate::Error;
+use crate::agent::{self, AgentTool};
 use crate::config::Config;
 use crate::content::slug::Slug;
 use crate::output::OutputWriter;
@@ -14,48 +15,39 @@ struct Scaffold {
     title: String,
 }
 
-pub fn new(name: &str) -> Result<(), Error> {
+pub fn new(name: &str, agent: Option<AgentTool>) -> Result<(), Error> {
     let dir = PathBuf::from(name);
     if dir.exists() {
         return Err(Error::Scaffold {
             message: format!("directory '{}' already exists", dir.display()),
         });
     }
-    fs::create_dir_all(&dir)?;
-
     let title = title_from_name(dir.file_name().and_then(|n| n.to_str()).unwrap_or(name));
-    let scaffold = Scaffold { dir, title };
-    scaffold.write_all()?;
-    scaffold.build_site()?;
+    Scaffold::create(dir, title, agent)?;
 
     tracing::info!(name, "created new site");
     println!("\n  To get started:\n");
     println!("    cd {name}");
     println!("    aphid serve\n");
+    print_agent_footer(agent);
     Ok(())
 }
 
-pub fn init(path: &Path) -> Result<(), Error> {
-    let dir = path.to_path_buf();
-    if dir.join("aphid.toml").exists() {
+pub fn init(path: &Path, agent: Option<AgentTool>) -> Result<(), Error> {
+    if path.join("aphid.toml").exists() {
         return Err(Error::Scaffold {
             message: format!(
                 "directory '{}' already contains an aphid.toml",
-                dir.display()
+                path.display()
             ),
         });
     }
-    fs::create_dir_all(&dir)?;
-
-    let title = dir
+    let title = path
         .file_name()
         .and_then(|n| n.to_str())
         .map(title_from_name)
         .unwrap_or_else(|| "My Site".to_string());
-
-    let scaffold = Scaffold { dir, title };
-    scaffold.write_all()?;
-    scaffold.build_site()?;
+    Scaffold::create(path.to_path_buf(), title, agent)?;
 
     tracing::info!(path = %path.display(), "initialized site");
     if path == Path::new(".") {
@@ -66,7 +58,14 @@ pub fn init(path: &Path) -> Result<(), Error> {
         println!("    cd {}", path.display());
         println!("    aphid serve\n");
     }
+    print_agent_footer(agent);
     Ok(())
+}
+
+fn print_agent_footer(agent: Option<AgentTool>) {
+    if let Some(tool) = agent {
+        println!("  Agent instructions written for {}.\n", tool.label());
+    }
 }
 
 pub fn new_blog_post(config_path: &Path, title: &str) -> Result<(), Error> {
@@ -182,6 +181,20 @@ fn write_file(path: &Path, content: &str) -> Result<(), Error> {
 }
 
 impl Scaffold {
+    /// Scaffold a complete site at `dir`: write all initial files, build once,
+    /// and — if requested — write agent instruction files.
+    fn create(dir: PathBuf, title: String, agent: Option<AgentTool>) -> Result<Self, Error> {
+        fs::create_dir_all(&dir)?;
+        let scaffold = Self { dir, title };
+        scaffold.write_all()?;
+        scaffold.build_site()?;
+        if let Some(tool) = agent {
+            agent::init(tool, &scaffold.dir)?;
+            tracing::info!(tool = ?tool, "wrote agent instructions");
+        }
+        Ok(scaffold)
+    }
+
     fn write_all(&self) -> Result<(), Error> {
         self.write_config()?;
         self.write_gitignore()?;
@@ -325,7 +338,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let site_dir = tmp.path().join("test-site");
 
-        new(site_dir.to_str().unwrap()).unwrap();
+        new(site_dir.to_str().unwrap(), None).unwrap();
 
         assert!(site_dir.join("aphid.toml").exists());
         assert!(site_dir.join(".gitignore").exists());
@@ -349,15 +362,31 @@ mod tests {
         let site_dir = tmp.path().join("existing");
         fs::create_dir(&site_dir).unwrap();
 
-        let err = new(site_dir.to_str().unwrap()).unwrap_err();
+        let err = new(site_dir.to_str().unwrap(), None).unwrap_err();
         assert!(err.to_string().contains("already exists"));
+    }
+
+    #[test]
+    fn new_with_agent_writes_both() {
+        let tmp = tempfile::tempdir().unwrap();
+        let site_dir = tmp.path().join("with-agent");
+
+        new(site_dir.to_str().unwrap(), Some(AgentTool::Claude)).unwrap();
+
+        assert!(site_dir.join("aphid.toml").exists());
+        assert!(site_dir.join("CLAUDE.md").exists());
+        assert!(
+            site_dir
+                .join(".claude/skills/aphid-content/SKILL.md")
+                .exists()
+        );
     }
 
     #[test]
     fn init_creates_in_existing_directory() {
         let tmp = tempfile::tempdir().unwrap();
 
-        init(tmp.path()).unwrap();
+        init(tmp.path(), None).unwrap();
 
         assert!(tmp.path().join("aphid.toml").exists());
         assert!(tmp.path().join(".gitignore").exists());
@@ -369,7 +398,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         fs::write(tmp.path().join("aphid.toml"), "").unwrap();
 
-        let err = init(tmp.path()).unwrap_err();
+        let err = init(tmp.path(), None).unwrap_err();
         assert!(err.to_string().contains("already contains an aphid.toml"));
     }
 
@@ -378,14 +407,25 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let nested = tmp.path().join("nested/site");
 
-        init(&nested).unwrap();
+        init(&nested, None).unwrap();
 
         assert!(nested.join("aphid.toml").exists());
     }
 
+    #[test]
+    fn init_with_agent_writes_both() {
+        let tmp = tempfile::tempdir().unwrap();
+
+        init(tmp.path(), Some(AgentTool::Codex)).unwrap();
+
+        assert!(tmp.path().join("aphid.toml").exists());
+        assert!(tmp.path().join("AGENTS.md").exists());
+        assert!(tmp.path().join(".agents/aphid-content.md").exists());
+    }
+
     fn scaffold_site(tmp: &Path) -> PathBuf {
         let site_dir = tmp.join("site");
-        new(site_dir.to_str().unwrap()).unwrap();
+        new(site_dir.to_str().unwrap(), None).unwrap();
         site_dir
     }
 
