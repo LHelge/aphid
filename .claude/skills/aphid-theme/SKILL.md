@@ -1,3 +1,8 @@
+---
+name: aphid-theme
+description: Reference for editing aphid themes. Use when modifying Tera templates under theme/templates/, designing layouts, working with template variables, or changing theme CSS and static assets.
+---
+
 This project uses aphid, a static site generator. Themes are directories containing Tera
 templates (Jinja2-style) and optional static files. The goal is to design a complete theme.
 
@@ -106,7 +111,6 @@ Renders the site root (`/index.html`).
 | `posts` | list | All blog posts (see post entry shape below) |
 | `home` | object? | Present when `content/home.md` exists; has `content` (rendered HTML — use `\| safe`) |
 | `contains_mermaid` | bool | True if any rendered block uses Mermaid |
-| `popular_tags` | list | All tags across blog and wiki, sorted by descending count then ascending name. Each entry has `name`, `slug`, `count`. Counts match `/tags/`. Slice with `\| slice(end=N)` for top-N. |
 
 # blog_post.html
 

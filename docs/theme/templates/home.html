@@ -114,4 +114,20 @@ page_title %} {% block content %}
     </article>
     {% endfor %}
 </div>
+
+{% if popular_tags | length > 0 %}
+<section class="tag-cloud-section">
+    <div class="blog-section-header">
+        <h2 class="section-title">Browse by topic</h2>
+        <a href="/tags/" class="section-more">All tags →</a>
+    </div>
+    <div class="tag-cloud">
+        {% for tag in popular_tags %}
+        <a href="/tags/{{ tag.slug }}/" class="tag-badge tag-badge-cloud">
+            {{ tag.name }}<span class="tag-count">{{ tag.count }}</span>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
 {% endblock content %}

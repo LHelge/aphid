@@ -297,6 +297,10 @@ pub struct HomeContext {
     pub posts: Vec<PostEntry>,
     pub home: Option<HomeContent>,
     pub contains_mermaid: bool,
+    /// Every tag used across blog and wiki content, sorted by descending
+    /// count and then ascending name. Themes use this to render a tag
+    /// cloud on the home page; counts match the `/tags/` index.
+    pub popular_tags: Vec<TagEntry>,
 }
 
 /// A wiki page summary for the wiki index listing.
@@ -398,7 +402,12 @@ pub struct TagPageContext {
 }
 
 /// A tag summary for the tags index listing.
-#[derive(Debug, Clone, Serialize)]
+///
+/// Natural ordering is "popularity": descending `count` first, then
+/// ascending `name` to break ties alphabetically. Callers that want
+/// alphabetical order (e.g. the `/tags/` index) sort by `name`
+/// explicitly via `sort_by`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct TagEntry {
     pub name: String,
     pub slug: Slug,
@@ -412,6 +421,35 @@ impl TagEntry {
             slug: name.into(),
             count,
         }
+    }
+
+    /// Every tag across blog and wiki content, sorted by popularity
+    /// (descending count, ties broken by ascending name). Counts match
+    /// the `/tags/` index — a tag's number is identical wherever it
+    /// appears on the site.
+    pub fn popular_from_site(site: &Site) -> Vec<Self> {
+        let mut tags: Vec<Self> = site
+            .tag_index
+            .iter()
+            .map(|(name, slugs)| Self::new(name, slugs.len()))
+            .collect();
+        tags.sort();
+        tags
+    }
+}
+
+impl Ord for TagEntry {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        other
+            .count
+            .cmp(&self.count)
+            .then_with(|| self.name.cmp(&other.name))
+    }
+}
+
+impl PartialOrd for TagEntry {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -858,5 +896,64 @@ mod tests {
         assert_eq!(ctx.name, "Bob");
         assert!(ctx.link.is_none());
         assert!(ctx.image.is_none());
+    }
+
+    #[test]
+    fn tag_entry_sorts_by_count_desc_then_name_asc() {
+        let mut tags = [
+            TagEntry::new("rust", 2),
+            TagEntry::new("apple", 5),
+            TagEntry::new("banana", 5),
+            TagEntry::new("zebra", 1),
+        ];
+        tags.sort();
+        let order: Vec<_> = tags.iter().map(|t| t.name.as_str()).collect();
+        assert_eq!(order, vec!["apple", "banana", "rust", "zebra"]);
+    }
+
+    fn tagged_blog_post(
+        slug: &str,
+        day: u32,
+        tags: &[&str],
+    ) -> Page<crate::content::BlogFrontmatter> {
+        use crate::content::BlogFrontmatter;
+        use chrono::NaiveDate;
+        Page {
+            slug: slug.into(),
+            body: String::new(),
+            path: PathBuf::from(format!("content/blog/{slug}.md")),
+            frontmatter: BlogFrontmatter {
+                title: format!("Post {slug}"),
+                slug: slug.into(),
+                author: "T".into(),
+                created: NaiveDate::from_ymd_opt(2026, 1, day).unwrap(),
+                updated: None,
+                image: None,
+                description: None,
+                tags: tags.iter().map(|s| (*s).to_owned()).collect(),
+                draft: false,
+            },
+        }
+    }
+
+    #[test]
+    fn popular_from_site_returns_tags_in_popularity_order() {
+        let posts = vec![
+            tagged_blog_post("a", 1, &["rust", "cli"]),
+            tagged_blog_post("b", 2, &["rust"]),
+            tagged_blog_post("c", 3, &["rust", "cli", "web"]),
+        ];
+        let config: Config = "title = \"T\"\nbase_url = \"http://x\"".parse().unwrap();
+        let site = Site::from_parts(config, posts, vec![], vec![]).unwrap();
+        let tags = TagEntry::popular_from_site(&site);
+        let pairs: Vec<_> = tags.iter().map(|t| (t.name.as_str(), t.count)).collect();
+        assert_eq!(pairs, vec![("rust", 3), ("cli", 2), ("web", 1)]);
+    }
+
+    #[test]
+    fn popular_from_site_empty_when_no_tags() {
+        let config: Config = "title = \"T\"\nbase_url = \"http://x\"".parse().unwrap();
+        let site = Site::from_parts(config, vec![], vec![], vec![]).unwrap();
+        assert!(TagEntry::popular_from_site(&site).is_empty());
     }
 }

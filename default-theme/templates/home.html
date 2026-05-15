@@ -26,4 +26,14 @@
     </li>
     {% endfor %}
 </ul>
+{% if popular_tags | length > 0 %}
+<aside class="tag-cloud">
+    <h2>Tags</h2>
+    <ul>
+        {% for tag in popular_tags %}
+        <li><a href="/tags/{{ tag.slug }}/">{{ tag.name }}</a> <span class="tag-count">{{ tag.count }}</span></li>
+        {% endfor %}
+    </ul>
+</aside>
+{% endif %}
 {% endblock content %}

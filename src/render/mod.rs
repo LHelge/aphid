@@ -265,11 +265,13 @@ impl<'a> Renderer<'a> {
         let home_rendered = rendered.home().map(|(_, r)| r);
         let home_content = home_rendered.map(HomeContent::from);
         let contains_mermaid = home_rendered.is_some_and(|r| r.contains_mermaid);
+        let popular_tags = TagEntry::popular_from_site(site);
         let home_ctx = HomeContext {
             site: site_ctx.clone(),
             posts: posts.clone(),
             home: home_content,
             contains_mermaid,
+            popular_tags,
         };
         pages.insert("/".into(), self.render_template("home.html", &home_ctx)?);
 
