@@ -13,7 +13,7 @@ use tera::Context;
 use crate::Error;
 use crate::artifacts;
 use crate::config::Config;
-use crate::content::{PageView, Site};
+use crate::content::{PageView, Site, Slug};
 use crate::favicon::FaviconSet;
 use crate::markdown::{Diagnostics, MarkdownRenderer, RenderedSite};
 
@@ -195,38 +195,36 @@ impl<'a> Renderer<'a> {
         site_ctx: &SiteContext,
     ) -> Result<HashMap<String, String>, Error> {
         let mut pages = HashMap::new();
-        let mut all_tags: Vec<TagEntry> = Vec::new();
         let per_page = site.config.posts_per_page.max(1);
 
         let wpm = site.config.reading_wpm;
         for (tag, slugs) in &site.tag_index {
-            let posts: Vec<PostEntry> = slugs
+            let posts: Vec<(TaggedKind, PostEntry)> = slugs
                 .iter()
                 .filter_map(|slug| {
                     site.blog_post(slug)
-                        .map(|p| PostEntry::from_blog_page(p, wpm))
+                        .map(|p| (TaggedKind::Blog, PostEntry::from_blog_page(p, wpm)))
                         .or_else(|| {
                             site.wiki_page(slug)
-                                .map(|p| PostEntry::from_wiki_page(p, wpm))
+                                .map(|p| (TaggedKind::Wiki, PostEntry::from_wiki_page(p, wpm)))
                         })
                 })
                 .collect();
 
-            let tag_entry = TagEntry::new(tag, posts.len());
-            let tag_slug = tag_entry.slug.clone();
-            all_tags.push(tag_entry);
-
+            let tag_slug: Slug = tag.as_str().into();
             let base_path = format!("/tags/{tag_slug}/");
             let chunks = paginate(&posts, per_page);
             let total = chunks.len();
             for (i, chunk) in chunks.iter().enumerate() {
                 let current = i + 1;
                 let pagination = Pagination::build(&base_path, current, total);
+                let (blog_posts, wiki_pages) = split_chunk_by_kind(chunk);
                 let ctx = TagPageContext {
                     site: site_ctx.clone(),
                     tag: tag.clone(),
                     tag_slug: tag_slug.clone(),
-                    posts: chunk.to_vec(),
+                    blog_posts,
+                    wiki_pages,
                     pagination,
                 };
                 let html = self.render_template("tag.html", &ctx)?;
@@ -239,6 +237,11 @@ impl<'a> Renderer<'a> {
             }
         }
 
+        let mut all_tags: Vec<TagEntry> = site
+            .tag_index
+            .iter()
+            .map(|(name, slugs)| TagEntry::new(name, slugs.len()))
+            .collect();
         all_tags.sort_by(|a, b| a.name.cmp(&b.name));
         let ctx = TagsIndexContext {
             site: site_ctx.clone(),
@@ -322,6 +325,24 @@ fn paginate<T>(items: &[T], per_page: usize) -> Vec<&[T]> {
     items.chunks(per_page).collect()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TaggedKind {
+    Blog,
+    Wiki,
+}
+
+fn split_chunk_by_kind(chunk: &[(TaggedKind, PostEntry)]) -> (Vec<PostEntry>, Vec<PostEntry>) {
+    let mut blog_posts = Vec::new();
+    let mut wiki_pages = Vec::new();
+    for (kind, entry) in chunk {
+        match kind {
+            TaggedKind::Blog => blog_posts.push(entry.clone()),
+            TaggedKind::Wiki => wiki_pages.push(entry.clone()),
+        }
+    }
+    (blog_posts, wiki_pages)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -377,7 +398,7 @@ mod tests {
         tera.add_raw_template("wiki_index.html", "wiki").unwrap();
         tera.add_raw_template(
             "tag.html",
-            "{% if pagination %}p{{ pagination.current }}/{{ pagination.total }}{% else %}single{% endif %}: {% for p in posts %}{{ p.title }};{% endfor %}",
+            "{% if pagination %}p{{ pagination.current }}/{{ pagination.total }}{% else %}single{% endif %}: {% for p in blog_posts %}{{ p.title }};{% endfor %}{% for p in wiki_pages %}{{ p.title }};{% endfor %}",
         )
         .unwrap();
         tera.add_raw_template("tags_index.html", "tags").unwrap();
