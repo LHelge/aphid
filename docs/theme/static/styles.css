@@ -578,6 +578,35 @@ a:hover {
   color: var(--accent);
 }
 
+/* ── Tag cloud (home page) ───────────────────────────────────────────────── */
+.tag-cloud-section {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 8px 24px 56px;
+}
+
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-badge-cloud {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tag-badge-cloud .tag-count {
+  font-size: 10px;
+  color: var(--overlay0);
+  font-variant-numeric: tabular-nums;
+}
+
+.tag-badge-cloud:hover .tag-count {
+  color: var(--accent);
+}
+
 /* ── TOC sidebar ─────────────────────────────────────────────────────────── */
 .toc-sidebar {
   position: sticky;

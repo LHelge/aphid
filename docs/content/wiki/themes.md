@@ -3,6 +3,7 @@ title: Themes
 category: Customization
 tags:
   - reference
+  - themes
 ---
 
 A theme is a directory containing HTML templates and optional static files. Point `aphid.toml` at it with `theme_dir`:
@@ -139,6 +140,7 @@ Renders the site root (`/index.html`). Receives the post list plus an optional r
 | `posts` | list | All blog posts — see the post entry shape below |
 | `home` | object? | Present when `content/home.md` exists. Has `content` (string, the rendered HTML — pass through `\| safe`). |
 | `contains_mermaid` | bool | `true` when `home.md` contains at least one ` ```mermaid ` block. See [Mermaid diagrams](#mermaid-diagrams) |
+| `popular_tags` | list | Every tag used across blog and wiki content, sorted by descending count then ascending name. Each entry has `name`, `slug`, and `count`. Counts match the `/tags/` index. Slice with `\| slice(end=N)` in Tera if you want a top-N cloud. |
 
 ## blog_index.html
 
