@@ -149,6 +149,7 @@ Renders the blog listing at `/blog/`.
 | `created` | string? | Publication date |
 | `image` | string? | Hero image path or URL |
 | `description` | string? | Short summary from frontmatter |
+| `reading_time_minutes` | int | Reading-time estimate (rounded up, minimum 1) — same value as on the post template |
 | `tags` | list | Each has `name` and `slug` |
 
 # wiki_page.html
@@ -157,9 +158,9 @@ Renders a single wiki page. Has many of the same variables as `blog_post.html`, 
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `category` | string? | Category name from frontmatter |
+| `category` | string | Category name. Falls back to `wiki_default_category` (default `"Other"`) when frontmatter omits it, so always non-empty |
 | `backlinks` | list | Pages linking here; each has `title` and `url` |
-| `wiki_categories` | list | All wiki pages grouped by category — for a sidebar. Each entry has `name` (string or null) and `pages` (list of `{title, url}`). Named categories appear first; uncategorised pages appear under `name = null`. |
+| `wiki_categories` | list | All wiki pages grouped by category — for a sidebar. Each entry has `name` (string) and `pages` (list of `{title, url}`). Named categories listed in `wiki_categories` config appear first, then alphabetical; the default catch-all group sorts last. |
 
 `author`, `image` are always absent on wiki pages. `created`, `updated`, `tags` are present
 only if set in frontmatter.
@@ -200,7 +201,20 @@ Renders the tag listing at `/tags/`.
 
 # pagination.html
 
-Included by listing templates. Receives the surrounding template's `pagination` object.
+Included by listing templates (`blog_index.html`). Receives the surrounding template's
+`pagination` object:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `current` | int | 1-indexed current page number |
+| `total` | int | Total number of pages |
+| `prev_url` | string? | URL of the previous page, `null` on page 1 |
+| `next_url` | string? | URL of the next page, `null` on the last page |
+| `pages` | list | Every page — each entry has `n` (int) and `url` (string) for numeric nav |
+
+`pagination` is `null` when the entire listing fits on one page; templates should guard
+the include with `{% if pagination %}`. Tag pages are not paginated — `tag.html` never
+receives a `pagination` variable.
 
 # 404.html
 
@@ -247,7 +261,37 @@ monospace font and a background color that contrasts with the page.
 
 When `contains_mermaid` is true, the template should load `/static/js/mermaid.min.js`
 (bundled by aphid) and initialise it. The renderer wraps Mermaid blocks in
-`<pre class="mermaid">`, which Mermaid picks up on initialise.
+`<pre class="mermaid">`, which Mermaid picks up on initialise. Gate the script tag on
+`contains_mermaid` so pages without diagrams don't pay the download cost:
+
+```html
+{% if contains_mermaid %}
+<script src="/static/js/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true });</script>
+{% endif %}
+```
+
+# Social meta tags
+
+`base.html` is expected to emit OpenGraph and Twitter card meta tags in the `<head>` of
+every page. Two Tera blocks are reserved for per-template overrides:
+
+| Block | Default | Override on |
+|-------|---------|-------------|
+| `og_type` | `"website"` | `blog_post.html` → `"article"` |
+| `article_meta` | empty | `blog_post.html` → `article:published_time`, `article:modified_time`, `article:author`, `article:tag` |
+
+Tag content comes from these context fields, with fallbacks:
+
+- `og:title` / `twitter:title` — page `title`, falling back to `site_title`
+- `og:description` / `twitter:description` / `<meta name="description">` — page `description`, falling back to `site_description`
+- `og:url` — page `canonical_url` (only emitted when the page exposes one)
+- `og:image` / `twitter:image` — blog post `og_image`, falling back to `social_image_url`
+- `twitter:card` — `summary_large_image` when an image is set, `summary` otherwise
+- `og:site_name` — `site_title`
+
+Pages without an image still produce valid tags — they just drop the `og:image` /
+`twitter:image` lines and downgrade the card type to `summary`.
 
 # Design guidelines
 

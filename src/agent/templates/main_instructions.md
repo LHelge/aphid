@@ -21,11 +21,16 @@ it with project-specific guidance; delete it first if you want a clean regenerat
 
 # Common commands
 
-- `aphid serve` — start the dev server on port 3000 with file watching and live reload.
-- `aphid build` — render the site into `dist/`.
-- `aphid blog new "Title"` — scaffold a new blog post.
+- `aphid serve` — start the dev server on port 3000 with file watching and live reload. `--port` overrides the port.
+- `aphid build` — render the site into `dist/`. `--output <dir>` overrides the directory.
+- `aphid new <name>` — scaffold a complete site in a new directory.
+- `aphid init [path]` — scaffold a site in the current (or given) directory.
+- `aphid blog new "Title"` — scaffold a new blog post (filename gets today's date prefix).
 - `aphid wiki new "Title"` — scaffold a new wiki page.
 - `aphid page new "Title"` — scaffold a new standalone page.
+- `aphid agent <tool>` — regenerate the AI-agent instruction files. `<tool>` is `claude`, `codex`, `copilot`, etc. Pass no tool for a generic `AGENTS.md`. Run this after upgrading aphid to refresh the skill files with any new features.
+
+The global `--config <path>` flag (default `aphid.toml`) overrides the config file location on every subcommand.
 
 # Detailed references
 

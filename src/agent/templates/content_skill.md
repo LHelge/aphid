@@ -72,6 +72,8 @@ files of the same path.
 # Supported markdown extensions
 
 - Tables, strikethrough (`~~text~~`), task lists (`- [x]`), footnotes (`[^1]`).
+- Smart punctuation — straight quotes and `--`/`---` get converted to typographic forms at
+  render time. Write naturally; don't hand-type `"`, `—`, etc.
 - Fenced code blocks with syntax highlighting (specify the language after the opening
   fence). Highlighting emits CSS classes prefixed `hl-`.
 - Mermaid diagrams via fenced ` ```mermaid ` blocks — rendered as `<pre class="mermaid">`
