@@ -13,6 +13,18 @@ pub struct Page<F> {
     pub frontmatter: F,
 }
 
+impl<F> Page<F> {
+    /// Rough reading-time estimate for the page body, in minutes (rounded
+    /// up, minimum 1). Counts whitespace-separated tokens in the markdown
+    /// source — markdown punctuation tokens (`#`, `-`, etc.) are a small
+    /// constant factor of noise for "X min read" purposes. `wpm` is the
+    /// assumed words-per-minute reading speed, from `Config::reading_wpm`.
+    pub fn reading_time_minutes(&self, wpm: u32) -> u32 {
+        let words = self.body.split_whitespace().count() as u32;
+        words.div_ceil(wpm.max(1)).max(1)
+    }
+}
+
 /// Which kind of page a given slug resolves to. Determines the URL
 /// scheme (`/blog/foo/`, `/wiki/foo/`, `/foo/`) and the template used
 /// for rendering.
@@ -227,5 +239,41 @@ mod tests {
     fn wiki_title_derived_from_slug() {
         let page = make_wiki_page("battery-pack", None);
         assert_eq!(page.title(), "Battery Pack");
+    }
+
+    #[test]
+    fn reading_time_rounds_up_to_nearest_minute() {
+        let mut page = make_blog_page("a");
+        // 100 words → less than a minute, but never less than 1.
+        page.body = "word ".repeat(100);
+        assert_eq!(page.reading_time_minutes(200), 1);
+        // 201 words → just over 1 minute → 2.
+        page.body = "word ".repeat(201);
+        assert_eq!(page.reading_time_minutes(200), 2);
+    }
+
+    #[test]
+    fn reading_time_for_empty_body_is_one_minute() {
+        // Edge case: a post with no body still rounds up to "1 min read"
+        // so the template never has to special-case zero.
+        let page = make_blog_page("empty");
+        assert_eq!(page.reading_time_minutes(200), 1);
+    }
+
+    #[test]
+    fn reading_time_at_word_boundary() {
+        // Exactly 200 words → exactly 1 minute, not 2 (no overshoot).
+        let mut page = make_blog_page("a");
+        page.body = "word ".repeat(200);
+        assert_eq!(page.reading_time_minutes(200), 1);
+    }
+
+    #[test]
+    fn reading_time_scales_with_wpm() {
+        // The same body takes fewer minutes at a higher wpm.
+        let mut page = make_blog_page("a");
+        page.body = "word ".repeat(500);
+        assert_eq!(page.reading_time_minutes(200), 3); // 500 / 200 = 2.5 → 3
+        assert_eq!(page.reading_time_minutes(250), 2); // 500 / 250 = 2 → 2
     }
 }

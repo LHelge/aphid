@@ -151,36 +151,43 @@ pub struct PostEntry {
     pub created: Option<String>,
     pub image: Option<String>,
     pub description: Option<String>,
+    pub reading_time_minutes: u32,
     pub tags: Vec<TagRef>,
 }
 
 impl PostEntry {
-    pub fn from_blog_page(page: &Page<BlogFrontmatter>) -> Self {
+    pub fn from_blog_page(page: &Page<BlogFrontmatter>, wpm: u32) -> Self {
         Self {
             title: page.frontmatter.title.clone(),
             url: page.url_path(),
             created: Some(page.frontmatter.created.to_string()),
             image: page.frontmatter.image.clone(),
             description: page.frontmatter.description.clone(),
+            reading_time_minutes: page.reading_time_minutes(wpm),
             tags: TagRef::from_tags(&page.frontmatter.tags),
         }
     }
 
-    pub fn from_wiki_page(page: &Page<WikiFrontmatter>) -> Self {
+    pub fn from_wiki_page(page: &Page<WikiFrontmatter>, wpm: u32) -> Self {
         Self {
             title: page.frontmatter.title.clone(),
             url: page.url_path(),
             created: page.frontmatter.created.map(|d| d.to_string()),
             image: None,
             description: None,
+            reading_time_minutes: page.reading_time_minutes(wpm),
             tags: TagRef::from_tags(&page.frontmatter.tags),
         }
     }
 
     pub fn from_blog_pages<'a>(
         pages: impl IntoIterator<Item = &'a Page<BlogFrontmatter>>,
+        wpm: u32,
     ) -> Vec<Self> {
-        pages.into_iter().map(Self::from_blog_page).collect()
+        pages
+            .into_iter()
+            .map(|p| Self::from_blog_page(p, wpm))
+            .collect()
     }
 }
 
@@ -576,6 +583,9 @@ pub struct BlogPostContext {
     pub description: Option<String>,
     pub created: String,
     pub updated: Option<String>,
+    /// Rough reading-time estimate for the post body, in minutes (rounded
+    /// up, minimum 1). Templates typically render as "X min read".
+    pub reading_time_minutes: u32,
     pub tags: Vec<TagRef>,
     /// Adjacent post one step newer than this one in the blog feed.
     /// `None` on the newest blog post.
@@ -617,9 +627,10 @@ impl BlogPostContext {
             description: page.frontmatter.description.clone(),
             created: page.frontmatter.created.to_string(),
             updated: page.frontmatter.updated.map(|d| d.to_string()),
+            reading_time_minutes: page.reading_time_minutes(site.config.reading_wpm),
             tags: TagRef::from_tags(&page.frontmatter.tags),
-            newer_post: newer.map(PostEntry::from_blog_page),
-            older_post: older.map(PostEntry::from_blog_page),
+            newer_post: newer.map(|p| PostEntry::from_blog_page(p, site.config.reading_wpm)),
+            older_post: older.map(|p| PostEntry::from_blog_page(p, site.config.reading_wpm)),
         }
     }
 }
