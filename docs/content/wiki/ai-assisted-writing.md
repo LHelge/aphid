@@ -3,6 +3,8 @@ title: AI-Assisted Writing
 category: Customization
 tags:
   - guide
+  - ai
+  - content
 ---
 
 If you use an AI coding agent to help write content — whether that is GitHub Copilot, Claude Code, Cursor, Windsurf, or another tool — you can improve the results by giving the agent context about how aphid sites work. This page provides a ready-made instruction block you can drop into your project.

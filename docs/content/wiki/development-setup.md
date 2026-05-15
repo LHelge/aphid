@@ -3,6 +3,7 @@ title: Development Setup
 category: Development
 tags:
   - guide
+  - development
 ---
 
 This page walks through everything needed to build and run aphid from source on your local machine.

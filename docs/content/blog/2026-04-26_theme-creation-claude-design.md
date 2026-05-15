@@ -8,6 +8,7 @@ description: How I used Claude Design to create the default aphid theme and how 
 tags:
   - design
   - themes
+  - ai
 ---
 
 The default aphid theme is bare-bones — a white background, the content, and no styling whatsoever. Its main job is end-to-end testing. For the project's own blog and docs I wanted something that actually looked good, and building it with aphid itself is the best kind of [dogfooding](https://en.wikipedia.org/wiki/Eating_your_own_dog_food).

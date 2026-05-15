@@ -3,6 +3,7 @@ title: Configuration
 category: Getting Started
 tags:
   - reference
+  - configuration
 ---
 
 `aphid` reads a `aphid.toml` file at the project root. Pass an alternate path with `--config <path>`.

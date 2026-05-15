@@ -3,6 +3,8 @@ title: Frontmatter
 category: Content
 tags:
   - reference
+  - content
+  - configuration
 ---
 
 Every content file begins with a YAML frontmatter block delimited by `---`. The required and optional fields differ by content type.

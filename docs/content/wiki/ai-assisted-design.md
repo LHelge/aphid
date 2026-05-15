@@ -3,6 +3,8 @@ title: AI-Assisted Design
 category: Customization
 tags:
   - guide
+  - ai
+  - themes
 ---
 
 If you use an AI design tool like Claude to create or modify an aphid theme, you can get better results by giving it the full picture of what a theme requires. This page provides a ready-made instruction block covering the theme format, required templates, and every variable available in the Tera template context.

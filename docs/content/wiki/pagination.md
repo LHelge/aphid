@@ -3,6 +3,7 @@ title: Pagination
 category: Content
 tags:
   - reference
+  - themes
 ---
 
 `aphid` paginates the blog index and per-tag pages once a listing grows past `posts_per_page`. Page 1 stays at the canonical URL; pages 2 and beyond live under `page/N/`.

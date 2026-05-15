@@ -2,7 +2,8 @@
 title: Contributing
 category: Development
 tags:
-  - reference
+  - guide
+  - development
 ---
 
 Contributions are welcome. The project is dual licensed under MIT and Apache 2.0 — see the [About](/about/) page for details.

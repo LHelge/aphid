@@ -3,6 +3,7 @@ title: Wiki Links
 category: Content
 tags:
   - reference
+  - content
 ---
 
 Wiki-links let any page reference any other page using only the filename stem — no full paths, no extensions.
