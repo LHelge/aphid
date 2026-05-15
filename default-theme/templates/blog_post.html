@@ -16,6 +16,7 @@
         <div class="post-meta">
             {% if created %}<time>{{ created }}</time>{% endif %}
             {% if updated %}<time>(updated {{ updated }})</time>{% endif %}
+            <span class="reading-time">· {{ reading_time_minutes }} min read</span>
             {% if author %}
             <span class="author">
                 {% if author.link %}<a href="{{ author.link }}" class="author-link">{% endif %}

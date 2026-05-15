@@ -28,6 +28,7 @@ tags:
 | `social_image` | | Path or absolute URL to the default OpenGraph / Twitter card image — see [Social image](#social-image) |
 | `feed_limit` | `20` | Maximum number of blog posts in RSS/Atom feeds. Set to `0` to include all posts |
 | `posts_per_page` | `10` | Posts shown per page on the blog index and tag pages — see [[pagination]] |
+| `reading_wpm` | `200` | Words-per-minute used for blog post `reading_time_minutes`. Raise it (e.g. `250`) for prose-heavy sites, lower it for code-heavy ones |
 
 All path fields are resolved relative to the directory containing `aphid.toml`, so the same paths work regardless of which directory you invoke `aphid` from. For example, `aphid --config docs/aphid.toml build` looks for content in `docs/content/` even when run from the repo root.
 

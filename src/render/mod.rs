@@ -198,13 +198,17 @@ impl<'a> Renderer<'a> {
         let mut all_tags: Vec<TagEntry> = Vec::new();
         let per_page = site.config.posts_per_page.max(1);
 
+        let wpm = site.config.reading_wpm;
         for (tag, slugs) in &site.tag_index {
             let posts: Vec<PostEntry> = slugs
                 .iter()
                 .filter_map(|slug| {
                     site.blog_post(slug)
-                        .map(PostEntry::from_blog_page)
-                        .or_else(|| site.wiki_page(slug).map(PostEntry::from_wiki_page))
+                        .map(|p| PostEntry::from_blog_page(p, wpm))
+                        .or_else(|| {
+                            site.wiki_page(slug)
+                                .map(|p| PostEntry::from_wiki_page(p, wpm))
+                        })
                 })
                 .collect();
 
@@ -255,7 +259,7 @@ impl<'a> Renderer<'a> {
         let site = rendered.site();
         let mut pages = HashMap::new();
 
-        let posts = PostEntry::from_blog_pages(&site.blog);
+        let posts = PostEntry::from_blog_pages(&site.blog, site.config.reading_wpm);
         let per_page = site.config.posts_per_page.max(1);
 
         let home_rendered = rendered.home().map(|(_, r)| r);

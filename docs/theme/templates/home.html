@@ -105,6 +105,7 @@ page_title %} {% block content %}
                 <a href="/tags/{{ tag.slug }}/" class="tag-badge">{{ tag.name }}</a>
                 {% endfor %}
                 {% if post.created %}<span class="post-card-date">{{ post.created }}</span>{% endif %}
+                <span class="post-card-date">· {{ post.reading_time_minutes }} min read</span>
             </div>
             <h3 class="post-card-title"><a href="{{ post.url }}" class="post-card-link">{{ post.title }}</a></h3>
             {% if post.description %}<p class="post-card-excerpt">{{ post.description }}</p>{% endif %}

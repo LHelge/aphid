@@ -11,6 +11,7 @@
         <div class="post-featured-meta">
           <span class="post-featured-badge">Latest</span>
           {% if featured.created %}<span class="post-featured-date">{{ featured.created }}</span>{% endif %}
+          <span class="post-featured-date">· {{ featured.reading_time_minutes }} min read</span>
         </div>
         {% if featured.image %}
         <img src="{{ featured.image }}" alt="" class="post-featured-image">

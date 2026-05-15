@@ -37,6 +37,10 @@ fn default_wiki_default_category() -> String {
     "Other".to_string()
 }
 
+fn default_reading_wpm() -> u32 {
+    200
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub title: String,
@@ -84,6 +88,11 @@ pub struct Config {
     /// `/tags/{tag}/`); subsequent pages live under `page/N/`. Defaults to 10.
     #[serde(default = "default_posts_per_page")]
     pub posts_per_page: usize,
+    /// Words-per-minute used for the blog post `reading_time_minutes`
+    /// estimate. Defaults to 200 (a conservative pace that fits technical
+    /// writing with code samples); raise it for prose-heavy sites.
+    #[serde(default = "default_reading_wpm")]
+    pub reading_wpm: u32,
 }
 
 impl std::str::FromStr for Config {

@@ -111,6 +111,7 @@ Universal page variables, plus:
 | `description` | string? | Short summary, from frontmatter |
 | `created` | string | Publication date, formatted `YYYY-MM-DD` |
 | `updated` | string? | Last-edited date |
+| `reading_time_minutes` | integer | Rough reading-time estimate for the body, in minutes (rounded up, minimum 1). Render as e.g. `{{ reading_time_minutes }} min read` |
 | `tags` | list | Each tag has `name` and `slug` |
 | `newer_post` | object? | Adjacent post one step newer in the feed, or `null` on the newest post. Same shape as the post entries on `blog_index.html`. |
 | `older_post` | object? | Adjacent post one step older in the feed, or `null` on the oldest post. Same shape. |
@@ -159,6 +160,7 @@ Each entry in `posts` (and on `tag.html`) has:
 | `created` | string? | Publication date, formatted `YYYY-MM-DD` |
 | `image` | string? | Path or URL of the hero image, from frontmatter |
 | `description` | string? | Short summary, from frontmatter |
+| `reading_time_minutes` | integer | Rough reading-time estimate for the body, in minutes (rounded up, minimum 1) — same value as on the post template itself |
 | `tags` | list | Each tag has `name` and `slug` |
 
 ## wiki_index.html

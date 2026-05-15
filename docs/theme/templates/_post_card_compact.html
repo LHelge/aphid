@@ -8,6 +8,7 @@
       <a href="/tags/{{ tag.slug }}/" class="tag-badge">{{ tag.name }}</a>
       {% endfor %}
       {% if post.created %}<span class="post-card-compact-date">{{ post.created }}</span>{% endif %}
+      <span class="post-card-compact-date">· {{ post.reading_time_minutes }} min read</span>
     </div>
     <h3 class="post-card-compact-title"><a href="{{ post.url }}" class="post-card-link">{{ post.title }}</a></h3>
     {% if post.description %}<p class="post-card-compact-excerpt">{{ post.description }}</p>{% endif %}
