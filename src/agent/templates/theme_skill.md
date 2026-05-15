@@ -185,9 +185,10 @@ Renders a single tag page.
 |----------|------|-------------|
 | `tag` | string | Tag display name |
 | `tag_slug` | string | URL-safe slug |
-| `blog_posts` | list | Blog posts in this page's slice (post entry shape). Guard with a length check — may be empty |
-| `wiki_pages` | list | Wiki pages in this page's slice. Same shape. Also may be empty |
-| `pagination` | object? | Pagination state. Paginates over the combined blog + wiki list |
+| `blog_posts` | list | All blog posts with this tag (post entry shape). Guard with a length check — may be empty |
+| `wiki_pages` | list | All wiki pages with this tag. Same shape. Also may be empty |
+
+Tag pages are not paginated.
 
 # tags_index.html
 

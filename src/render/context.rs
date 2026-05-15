@@ -392,10 +392,10 @@ pub struct WikiIndexContext {
 
 /// Context for a single tag page. Posts with the tag are split into a
 /// blog section and a wiki section so themes can render them separately.
-/// Pagination still operates over the combined list — each rendered page
-/// contains the slice of that page's items, partitioned by kind. Either
-/// list can be empty on any given page (e.g. page 2 of a tag with mostly
-/// blog content may carry only wiki pages).
+/// Tag pages are not paginated — chronological "newer/older" semantics
+/// don't fit wiki content, and tags rarely accumulate enough items to
+/// need chunking. Either list can be empty when the tag is exclusive to
+/// one kind of content; guard both with a length check.
 #[derive(Debug, Serialize)]
 pub struct TagPageContext {
     #[serde(flatten)]
@@ -404,7 +404,6 @@ pub struct TagPageContext {
     pub tag_slug: Slug,
     pub blog_posts: Vec<PostEntry>,
     pub wiki_pages: Vec<PostEntry>,
-    pub pagination: Option<Pagination>,
 }
 
 /// A tag summary for the tags index listing.
