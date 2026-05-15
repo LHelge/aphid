@@ -29,6 +29,7 @@
 //! # }
 //! ```
 
+pub mod agent;
 pub mod artifacts;
 pub mod config;
 pub mod content;
@@ -83,13 +84,24 @@ pub async fn serve(config_path: &Path, port: u16) -> Result<(), Error> {
 }
 
 /// Create a new site in a new directory named `name`.
-pub fn scaffold_new(name: &str) -> Result<(), Error> {
-    scaffold::new(name)
+///
+/// If `agent` is `Some`, AI-agent instruction files for that tool are written
+/// after the site is scaffolded.
+pub fn scaffold_new(name: &str, agent: Option<agent::AgentTool>) -> Result<(), Error> {
+    scaffold::new(name, agent)
 }
 
 /// Initialize a site in an existing directory at `path`.
-pub fn scaffold_init(path: &Path) -> Result<(), Error> {
-    scaffold::init(path)
+///
+/// If `agent` is `Some`, AI-agent instruction files for that tool are written
+/// after the site is scaffolded.
+pub fn scaffold_init(path: &Path, agent: Option<agent::AgentTool>) -> Result<(), Error> {
+    scaffold::init(path, agent)
+}
+
+/// Write AI-agent instruction files for `tool` into `dir`.
+pub fn agent_init(tool: agent::AgentTool, dir: &Path) -> Result<(), Error> {
+    agent::init(tool, dir)
 }
 
 /// Create a new blog post in the site at `config_path`.

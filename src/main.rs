@@ -17,10 +17,11 @@ async fn main() -> Result<(), Error> {
     match cli.command.unwrap_or(Command::Serve { port: 3000 }) {
         Command::Build { output } => aphid::build(&cli.config, &output).await,
         Command::Serve { port } => aphid::serve(&cli.config, port).await,
-        Command::New { name } => aphid::scaffold_new(&name),
-        Command::Init { path } => {
-            aphid::scaffold_init(&path.unwrap_or_else(|| std::path::PathBuf::from(".")))
-        }
+        Command::New { name, agent } => aphid::scaffold_new(&name, agent),
+        Command::Init { path, agent } => aphid::scaffold_init(
+            &path.unwrap_or_else(|| std::path::PathBuf::from(".")),
+            agent,
+        ),
         Command::Blog { action } => match action {
             cli::BlogAction::New { title } => aphid::new_blog_post(&cli.config, &title),
         },
@@ -30,5 +31,6 @@ async fn main() -> Result<(), Error> {
         Command::Page { action } => match action {
             cli::PageAction::New { title } => aphid::new_page(&cli.config, &title),
         },
+        Command::Agent { tool } => aphid::agent_init(tool, std::path::Path::new(".")),
     }
 }

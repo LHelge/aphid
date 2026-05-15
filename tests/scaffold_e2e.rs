@@ -5,7 +5,7 @@ use tempfile::TempDir;
 fn scaffold_new(name: &str) -> (TempDir, std::path::PathBuf) {
     let dir = TempDir::new().unwrap();
     let site_dir = dir.path().join(name);
-    aphid::scaffold_new(site_dir.to_str().unwrap()).unwrap();
+    aphid::scaffold_new(site_dir.to_str().unwrap(), None).unwrap();
     (dir, site_dir)
 }
 
@@ -73,7 +73,7 @@ fn new_fails_when_directory_exists() {
     let site = dir.path().join("exists");
     fs::create_dir(&site).unwrap();
 
-    let err = aphid::scaffold_new(site.to_str().unwrap()).unwrap_err();
+    let err = aphid::scaffold_new(site.to_str().unwrap(), None).unwrap_err();
     assert!(
         err.to_string().contains("already exists"),
         "unexpected error: {err}"
@@ -94,7 +94,7 @@ fn new_gitignore_contains_dist() {
 fn init_scaffolds_in_existing_directory() {
     let dir = TempDir::new().unwrap();
 
-    aphid::scaffold_init(dir.path()).unwrap();
+    aphid::scaffold_init(dir.path(), None).unwrap();
 
     assert!(dir.path().join("aphid.toml").exists());
     assert!(dir.path().join("content/blog").is_dir());
@@ -106,7 +106,7 @@ fn init_fails_when_config_exists() {
     let dir = TempDir::new().unwrap();
     fs::write(dir.path().join("aphid.toml"), "").unwrap();
 
-    let err = aphid::scaffold_init(dir.path()).unwrap_err();
+    let err = aphid::scaffold_init(dir.path(), None).unwrap_err();
     assert!(
         err.to_string().contains("already contains an aphid.toml"),
         "unexpected error: {err}"
@@ -118,7 +118,7 @@ fn init_creates_missing_directory() {
     let dir = TempDir::new().unwrap();
     let nested = dir.path().join("deep/nested/site");
 
-    aphid::scaffold_init(&nested).unwrap();
+    aphid::scaffold_init(&nested, None).unwrap();
 
     assert!(nested.join("aphid.toml").exists());
 }
@@ -127,7 +127,7 @@ fn init_creates_missing_directory() {
 fn init_produces_buildable_site() {
     let dir = TempDir::new().unwrap();
 
-    aphid::scaffold_init(dir.path()).unwrap();
+    aphid::scaffold_init(dir.path(), None).unwrap();
 
     let config_path = dir.path().join("aphid.toml");
     let output = dir.path().join("dist");

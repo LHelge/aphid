@@ -20,22 +20,30 @@ aphid [--config <path>] [<command>] [command flags]
 Create a new aphid site in a new directory. Generates a minimal but complete site structure: config file, example blog post, wiki page, about page, home page, static directory, and `.gitignore`.
 
 ```
-aphid new <name>
+aphid new <name> [--agent [TOOL]]
 ```
 
 The directory name is converted into the site title (`my-cool-blog` becomes "My Cool Blog"). Fails if the directory already exists.
+
+| Flag | Description |
+|------|-------------|
+| `--agent [TOOL]` | Also write AI-agent instruction files. Pass `claude`, `copilot`, or `codex`; omit the value for a generic `AGENTS.md`. See [[#aphid-agent]] for details. |
 
 ## `aphid init`
 
 Initialize an aphid site in an existing directory (or the current directory). Creates the same files as `aphid new`, but does not create a new parent directory.
 
 ```
-aphid init [path]
+aphid init [path] [--agent [TOOL]]
 ```
 
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `path` | `.` | Directory to initialize |
+
+| Flag | Description |
+|------|-------------|
+| `--agent [TOOL]` | Also write AI-agent instruction files. Pass `claude`, `copilot`, or `codex`; omit the value for a generic `AGENTS.md`. See [[#aphid-agent]] for details. |
 
 Fails if the target directory already contains an `aphid.toml`.
 
@@ -87,6 +95,32 @@ aphid page new <title>
 
 Example: `aphid page new "Contact"` creates `content/pages/contact.md`.
 
+## `aphid agent`
+
+Write AI-agent instruction files for the current site, so a coding agent can author content or edit themes with full project context. The instruction text is embedded in the binary — no network or filesystem lookup is required.
+
+```
+aphid agent [TOOL]
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `TOOL` | `codex` | One of `claude`, `copilot`, `codex`. Omit for a generic `AGENTS.md` (the `codex` layout, which is also recognised by Aider, Goose, and current Cursor). |
+
+For each tool, two scoped skills are written alongside the main instruction file: `aphid-content` (markdown, frontmatter, wiki-links, `aphid.toml`) and `aphid-theme` (Tera templates, template variables, static assets).
+
+| Tool | Files written |
+|------|---------------|
+| `claude` | `CLAUDE.md`, `.claude/skills/aphid-content/SKILL.md`, `.claude/skills/aphid-theme/SKILL.md` |
+| `copilot` | `.github/copilot-instructions.md`, `.github/instructions/aphid-content.instructions.md`, `.github/instructions/aphid-theme.instructions.md` |
+| `codex` | `AGENTS.md`, `.agents/aphid-content.md`, `.agents/aphid-theme.md` |
+
+Existing files at the target paths are overwritten — re-run after upgrading aphid to refresh the embedded instructions. Any local edits you have made will be lost, so keep project-specific guidance in a separate file.
+
+The same logic is reachable from `aphid init --agent <TOOL>` and `aphid new <name> --agent <TOOL>`, so first-time setup is a single command.
+
+See [[ai-assisted-writing]] and [[ai-assisted-design]] for the prose versions of these files.
+
 # Global flags
 
 | Flag | Default | Description |
@@ -99,11 +133,15 @@ Example: `aphid page new "Contact"` creates `content/pages/contact.md`.
 
 ```sh
 aphid new my-blog                        # scaffold a new site in my-blog/
+aphid new my-blog --agent claude         # scaffold + write Claude Code instructions
 aphid init                               # scaffold in the current directory
+aphid init --agent                       # scaffold + write a generic AGENTS.md
 aphid init path/to/site                  # scaffold in a specific directory
 aphid blog new "My First Post"           # create a new blog post
 aphid wiki new "Architecture Overview"   # create a new wiki page
 aphid page new "Contact"                 # create a new standalone page
+aphid agent claude                       # write Claude Code instructions for this site
+aphid agent                              # write a generic AGENTS.md
 aphid                                    # serve on :3000
 aphid serve --port 8080                  # serve on :8080
 aphid build                              # one-shot render into dist/
