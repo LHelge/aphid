@@ -12,8 +12,8 @@ impl RootArtifact for Robots {
 
     fn render(&self, rendered: &RenderedSite<'_>) -> Vec<u8> {
         tracing::debug!("generating robots.txt");
-        let base = rendered.site().config.normalized_base_url();
-        format!("User-agent: *\nAllow: /\n\nSitemap: {base}/sitemap.xml\n").into_bytes()
+        let sitemap_url = rendered.site().config.absolute_url("/sitemap.xml");
+        format!("User-agent: *\nAllow: /\n\nSitemap: {sitemap_url}\n").into_bytes()
     }
 }
 

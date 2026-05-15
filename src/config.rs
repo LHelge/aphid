@@ -1,6 +1,7 @@
 use crate::Error;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use url::Url;
 
 fn default_source_dir() -> PathBuf {
     PathBuf::from("content")
@@ -39,7 +40,10 @@ fn default_wiki_default_category() -> String {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub title: String,
-    pub base_url: String,
+    /// Site root URL. Validated as a real `http(s)://` URL at load time
+    /// and normalized so its path component always ends with `/`, which
+    /// makes [`Config::absolutize`] a trivial `Url::join`.
+    pub base_url: Url,
     /// Short site description used as the Atom `<subtitle>` and RSS
     /// `<channel><description>`.
     pub description: Option<String>,
@@ -86,22 +90,31 @@ impl std::str::FromStr for Config {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let config: Self = toml::from_str(s)?;
+        let mut config: Self = toml::from_str(s)?;
         config.validate()?;
         Ok(config)
     }
 }
 
 impl Config {
-    fn validate(&self) -> Result<(), Error> {
-        if !self.base_url.starts_with("http://") && !self.base_url.starts_with("https://") {
+    /// Check the scheme and normalize `base_url` so its path always ends
+    /// with `/`. Called once after deserialization so all downstream code
+    /// can treat `base_url` as canonical.
+    fn validate(&mut self) -> Result<(), Error> {
+        let scheme = self.base_url.scheme();
+        if scheme != "http" && scheme != "https" {
             return Err(Error::InvalidConfig {
                 field: "base_url",
                 message: format!(
-                    "must start with http:// or https://, got {:?}",
-                    self.base_url
+                    "must use http:// or https://, got {:?} (scheme {:?})",
+                    self.base_url.as_str(),
+                    scheme
                 ),
             });
+        }
+        if !self.base_url.path().ends_with('/') {
+            let with_slash = format!("{}/", self.base_url.path());
+            self.base_url.set_path(&with_slash);
         }
         Ok(())
     }
@@ -121,12 +134,16 @@ impl Config {
         Ok(config)
     }
 
-    pub fn normalized_base_url(&self) -> &str {
-        Self::normalize_base_url(&self.base_url)
-    }
-
-    pub fn normalize_base_url(base_url: &str) -> &str {
-        base_url.trim_end_matches('/')
+    /// Build a fully-qualified URL from a root-relative path (e.g.
+    /// `/wiki/foo/`) or an already-absolute URL. Supports subpath
+    /// deployments: with `base_url = "https://example.com/sub"`,
+    /// `absolute_url("/wiki/foo/")` correctly yields
+    /// `https://example.com/sub/wiki/foo/`.
+    pub fn absolute_url(&self, path: &str) -> Url {
+        let rel = path.strip_prefix('/').unwrap_or(path);
+        self.base_url
+            .join(rel)
+            .unwrap_or_else(|e| panic!("failed to join {path:?} to base_url: {e}"))
     }
 
     fn resolve_path(path: &mut PathBuf, base: &Path) {
@@ -163,7 +180,7 @@ mod tests {
         .parse()
         .unwrap();
         assert_eq!(cfg.title, "My Site");
-        assert_eq!(cfg.base_url, "https://example.com");
+        assert_eq!(cfg.base_url.as_str(), "https://example.com/");
         assert_eq!(cfg.source_dir, PathBuf::from("content"));
         assert!(cfg.theme_dir.is_none());
         assert_eq!(cfg.static_dir, PathBuf::from("static"));
@@ -233,10 +250,21 @@ mod tests {
             base_url = "/"
             "#
         .parse::<Config>();
-        assert!(result.is_err());
         let err = result.unwrap_err().to_string();
-        assert!(err.contains("base_url"));
-        assert!(err.contains("http"));
+        assert!(err.contains("base_url"), "err was: {err}");
+    }
+
+    #[test]
+    fn non_http_scheme_is_error() {
+        // Reaches our `validate` (`Url::parse` accepts `file://`), so we
+        // get the explicit "must use http://" diagnostic.
+        let result = r#"
+            title = "My Site"
+            base_url = "file:///tmp/site"
+            "#
+        .parse::<Config>();
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("http"), "err was: {err}");
     }
 
     #[test]
@@ -250,7 +278,9 @@ mod tests {
     }
 
     #[test]
-    fn normalized_base_url_strips_trailing_slash() {
+    fn base_url_path_canonicalized_with_trailing_slash() {
+        // Both forms should canonicalize the same way — `validate` adds a
+        // trailing slash if missing so `Url::join` semantics work uniformly.
         let with_slash: Config = r#"
             title = "My Site"
             base_url = "https://example.com/"
@@ -264,7 +294,63 @@ mod tests {
         .parse()
         .unwrap();
 
-        assert_eq!(with_slash.normalized_base_url(), "https://example.com");
-        assert_eq!(without_slash.normalized_base_url(), "https://example.com");
+        assert_eq!(with_slash.base_url.as_str(), "https://example.com/");
+        assert_eq!(without_slash.base_url.as_str(), "https://example.com/");
+    }
+
+    #[test]
+    fn subpath_base_url_gets_trailing_slash() {
+        let cfg: Config = r#"
+            title = "My Site"
+            base_url = "https://example.com/sub"
+            "#
+        .parse()
+        .unwrap();
+        assert_eq!(cfg.base_url.as_str(), "https://example.com/sub/");
+    }
+
+    fn config_with_base(base_url: &str) -> Config {
+        format!("title = \"T\"\nbase_url = \"{base_url}\"")
+            .parse()
+            .unwrap()
+    }
+
+    #[test]
+    fn absolute_url_joins_root_relative_path() {
+        let cfg = config_with_base("https://example.com");
+        assert_eq!(
+            cfg.absolute_url("/wiki/foo/").as_str(),
+            "https://example.com/wiki/foo/"
+        );
+    }
+
+    #[test]
+    fn absolute_url_handles_base_url_with_trailing_slash() {
+        let cfg = config_with_base("https://example.com/");
+        assert_eq!(
+            cfg.absolute_url("/wiki/foo/").as_str(),
+            "https://example.com/wiki/foo/"
+        );
+    }
+
+    #[test]
+    fn absolute_url_preserves_subpath_deployment() {
+        // base_url with a subpath should propagate into resolved URLs —
+        // the regression-prone case naive `format!("{base}{path}")` got
+        // right by accident and `Url::join` gets wrong without help.
+        let cfg = config_with_base("https://example.com/sub");
+        assert_eq!(
+            cfg.absolute_url("/wiki/foo/").as_str(),
+            "https://example.com/sub/wiki/foo/"
+        );
+    }
+
+    #[test]
+    fn absolute_url_passes_through_absolute_urls() {
+        let cfg = config_with_base("https://example.com");
+        assert_eq!(
+            cfg.absolute_url("https://other.example.com/x.png").as_str(),
+            "https://other.example.com/x.png"
+        );
     }
 }

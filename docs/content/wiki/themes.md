@@ -77,7 +77,6 @@ These come from `base.html` and are available in all templates via inheritance:
 | Variable | Type | Description |
 |----------|------|-------------|
 | `site_title` | string | From `title` in `aphid.toml` |
-| `base_url` | string | From `base_url` in `aphid.toml`, with any trailing slash stripped — safe to concatenate as `{{ base_url }}{{ url }}` |
 | `site_description` | string? | From `description` in `aphid.toml`. Used as the OpenGraph description fallback on pages without their own |
 | `social_image_url` | string? | Absolute URL for the site-wide default OpenGraph / Twitter card image — from `social_image` in `aphid.toml`. `None` when no `social_image` is configured |
 | `version` | string | The `aphid` binary version |
@@ -94,7 +93,8 @@ These appear on every page template (`blog_post.html`, `wiki_page.html`, `page.h
 | Variable | Type | Description |
 |----------|------|-------------|
 | `title` | string | Page title — from frontmatter, or for wiki pages the slug-derived title when frontmatter omits one |
-| `url` | string | Clean URL, e.g. `/blog/my-post/` |
+| `url` | string | Root-relative URL, e.g. `/blog/my-post/` |
+| `canonical_url` | string | Fully-qualified URL of this page (`base_url` joined with `url`). Render directly with `{{ canonical_url }}` for OpenGraph tags and similar — never concatenate URLs by hand in templates |
 | `content` | string | Rendered HTML body |
 | `toc` | list | Heading entries; each has `level`, `text`, and `id`. Always present (may be empty) |
 | `contains_mermaid` | bool | `true` when the body contains at least one ` ```mermaid ` block — gate the Mermaid runtime on this. See [Mermaid diagrams](#mermaid-diagrams) |
@@ -215,7 +215,7 @@ Tag content comes from these context fields:
 
 - `og:title` / `twitter:title` — page `title`, falling back to `site_title`
 - `og:description` / `twitter:description` / `<meta name="description">` — page `description`, falling back to `site_description`
-- `og:url` — `base_url` + page `url` (only emitted when the page has a `url`)
+- `og:url` — page `canonical_url` (only emitted when the page exposes one)
 - `og:image` / `twitter:image` — blog post `og_image`, falling back to `social_image_url`
 - `twitter:card` — `summary_large_image` when an image is set, `summary` otherwise
 - `og:site_name` — `site_title`

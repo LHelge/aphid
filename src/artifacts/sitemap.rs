@@ -36,28 +36,27 @@ struct Entry {
 }
 
 impl Entry {
-    fn new(base: &str, url_path: &str, lastmod: Option<String>) -> Self {
+    fn new(site: &Site, url_path: &str, lastmod: Option<String>) -> Self {
         Self {
-            loc: format!("{base}{url_path}"),
+            loc: site.config.absolute_url(url_path).into(),
             lastmod,
         }
     }
 }
 
 fn collect_entries(site: &Site) -> Vec<Entry> {
-    let base = site.config.normalized_base_url();
     let mut entries = Vec::new();
 
-    entries.push(Entry::new(base, "/", None));
-    entries.push(Entry::new(base, "/blog/", None));
+    entries.push(Entry::new(site, "/", None));
+    entries.push(Entry::new(site, "/blog/", None));
 
     for post in &site.blog {
         let url = PageKind::Blog.url_path(&post.slug);
         let date = post.frontmatter.updated.unwrap_or(post.frontmatter.created);
-        entries.push(Entry::new(base, &url, Some(date.to_string())));
+        entries.push(Entry::new(site, &url, Some(date.to_string())));
     }
 
-    entries.push(Entry::new(base, "/wiki/", None));
+    entries.push(Entry::new(site, "/wiki/", None));
 
     for page in &site.wiki {
         let url = PageKind::Wiki.url_path(&page.slug);
@@ -66,23 +65,23 @@ fn collect_entries(site: &Site) -> Vec<Entry> {
             .updated
             .or(page.frontmatter.created)
             .map(|d| d.to_string());
-        entries.push(Entry::new(base, &url, date));
+        entries.push(Entry::new(site, &url, date));
     }
 
     for page in &site.pages {
         let url = PageKind::Page.url_path(&page.slug);
-        entries.push(Entry::new(base, &url, None));
+        entries.push(Entry::new(site, &url, None));
     }
 
     if !site.tag_index.is_empty() {
-        entries.push(Entry::new(base, "/tags/", None));
+        entries.push(Entry::new(site, "/tags/", None));
     }
 
     let mut tags: Vec<&String> = site.tag_index.keys().collect();
     tags.sort();
     for tag in tags {
         let slug: Slug = tag.as_str().into();
-        entries.push(Entry::new(base, &format!("/tags/{slug}/"), None));
+        entries.push(Entry::new(site, &format!("/tags/{slug}/"), None));
     }
 
     entries
