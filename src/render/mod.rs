@@ -195,46 +195,34 @@ impl<'a> Renderer<'a> {
         site_ctx: &SiteContext,
     ) -> Result<HashMap<String, String>, Error> {
         let mut pages = HashMap::new();
-        let per_page = site.config.posts_per_page.max(1);
-
         let wpm = site.config.reading_wpm;
         for (tag, slugs) in &site.tag_index {
-            let posts: Vec<(TaggedKind, PostEntry)> = slugs
+            let blog_posts: Vec<PostEntry> = slugs
                 .iter()
                 .filter_map(|slug| {
                     site.blog_post(slug)
-                        .map(|p| (TaggedKind::Blog, PostEntry::from_blog_page(p, wpm)))
-                        .or_else(|| {
-                            site.wiki_page(slug)
-                                .map(|p| (TaggedKind::Wiki, PostEntry::from_wiki_page(p, wpm)))
-                        })
+                        .map(|p| PostEntry::from_blog_page(p, wpm))
+                })
+                .collect();
+            let wiki_pages: Vec<PostEntry> = slugs
+                .iter()
+                .filter_map(|slug| {
+                    site.wiki_page(slug)
+                        .map(|p| PostEntry::from_wiki_page(p, wpm))
                 })
                 .collect();
 
             let tag_slug: Slug = tag.as_str().into();
-            let base_path = format!("/tags/{tag_slug}/");
-            let chunks = paginate(&posts, per_page);
-            let total = chunks.len();
-            for (i, chunk) in chunks.iter().enumerate() {
-                let current = i + 1;
-                let pagination = Pagination::build(&base_path, current, total);
-                let (blog_posts, wiki_pages) = split_chunk_by_kind(chunk);
-                let ctx = TagPageContext {
-                    site: site_ctx.clone(),
-                    tag: tag.clone(),
-                    tag_slug: tag_slug.clone(),
-                    blog_posts,
-                    wiki_pages,
-                    pagination,
-                };
-                let html = self.render_template("tag.html", &ctx)?;
-                let url = if current == 1 {
-                    base_path.clone()
-                } else {
-                    format!("{base_path}page/{current}/")
-                };
-                pages.insert(url, html);
-            }
+            let url = format!("/tags/{tag_slug}/");
+            let ctx = TagPageContext {
+                site: site_ctx.clone(),
+                tag: tag.clone(),
+                tag_slug,
+                blog_posts,
+                wiki_pages,
+            };
+            let html = self.render_template("tag.html", &ctx)?;
+            pages.insert(url, html);
         }
 
         let mut all_tags: Vec<TagEntry> = site
@@ -325,24 +313,6 @@ fn paginate<T>(items: &[T], per_page: usize) -> Vec<&[T]> {
     items.chunks(per_page).collect()
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TaggedKind {
-    Blog,
-    Wiki,
-}
-
-fn split_chunk_by_kind(chunk: &[(TaggedKind, PostEntry)]) -> (Vec<PostEntry>, Vec<PostEntry>) {
-    let mut blog_posts = Vec::new();
-    let mut wiki_pages = Vec::new();
-    for (kind, entry) in chunk {
-        match kind {
-            TaggedKind::Blog => blog_posts.push(entry.clone()),
-            TaggedKind::Wiki => wiki_pages.push(entry.clone()),
-        }
-    }
-    (blog_posts, wiki_pages)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -398,7 +368,7 @@ mod tests {
         tera.add_raw_template("wiki_index.html", "wiki").unwrap();
         tera.add_raw_template(
             "tag.html",
-            "{% if pagination %}p{{ pagination.current }}/{{ pagination.total }}{% else %}single{% endif %}: {% for p in blog_posts %}{{ p.title }};{% endfor %}{% for p in wiki_pages %}{{ p.title }};{% endfor %}",
+            "tag: {% for p in blog_posts %}{{ p.title }};{% endfor %}|{% for p in wiki_pages %}{{ p.title }};{% endfor %}",
         )
         .unwrap();
         tera.add_raw_template("tags_index.html", "tags").unwrap();
@@ -481,7 +451,7 @@ mod tests {
     }
 
     #[test]
-    fn tag_pages_paginate_with_correct_urls() {
+    fn tag_pages_have_canonical_url_and_no_pagination() {
         let blog: Vec<_> = (0..12)
             .map(|i| make_blog_post(&format!("post-{i:02}"), 2026, (i + 1) as u32))
             .collect();
@@ -497,10 +467,11 @@ mod tests {
             .unwrap();
 
         assert!(pages.contains_key("/tags/rust/"));
-        assert!(pages.contains_key("/tags/rust/page/2/"));
-        assert!(pages.contains_key("/tags/rust/page/3/"));
-        assert!(!pages.contains_key("/tags/rust/page/1/"));
-        assert!(!pages.contains_key("/tags/rust/page/4/"));
+        assert!(
+            !pages.keys().any(|k| k.starts_with("/tags/rust/page/")),
+            "tag pages must not paginate: {:?}",
+            pages.keys().collect::<Vec<_>>()
+        );
     }
 
     #[test]
