@@ -175,11 +175,14 @@ Each entry in `posts` (and on `tag.html`) has:
 
 Renders one page of a tag's post listing. Page 1 lives at `/tags/{slug}/`; subsequent pages live at `/tags/{slug}/page/2/`, etc.
 
+Posts are split into `blog_posts` and `wiki_pages` so themes can render them as separate sections. Pagination operates over the combined list (same `posts_per_page` as before), and each page's slice is partitioned by kind — either list can be empty on any given page, so guard both with a length check.
+
 | Variable | Type | Description |
 |----------|------|-------------|
 | `tag` | string | Tag display name |
 | `tag_slug` | string | URL-safe slug |
-| `posts` | list | Tagged posts on the current page; each has `title`, `url`, `created?` |
+| `blog_posts` | list | Blog posts in this page's slice, in feed order. Post entry shape (see above). Empty when the slice has no blog posts |
+| `wiki_pages` | list | Wiki pages in this page's slice. Same shape. Empty when the slice has no wiki pages |
 | `pagination` | object? | Pagination state, or `null` when the entire tag fits on one page. See [[pagination]]. |
 
 ## tags_index.html

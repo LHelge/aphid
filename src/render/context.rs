@@ -390,14 +390,20 @@ pub struct WikiIndexContext {
     pub categories: Vec<WikiCategory>,
 }
 
-/// Context for a single tag page (posts with that tag, paginated).
+/// Context for a single tag page. Posts with the tag are split into a
+/// blog section and a wiki section so themes can render them separately.
+/// Pagination still operates over the combined list — each rendered page
+/// contains the slice of that page's items, partitioned by kind. Either
+/// list can be empty on any given page (e.g. page 2 of a tag with mostly
+/// blog content may carry only wiki pages).
 #[derive(Debug, Serialize)]
 pub struct TagPageContext {
     #[serde(flatten)]
     pub site: SiteContext,
     pub tag: String,
     pub tag_slug: Slug,
-    pub posts: Vec<PostEntry>,
+    pub blog_posts: Vec<PostEntry>,
+    pub wiki_pages: Vec<PostEntry>,
     pub pagination: Option<Pagination>,
 }
 

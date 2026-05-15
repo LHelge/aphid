@@ -6,40 +6,46 @@ expression: extract_main(&html)
 <main class="content">
         
 <h1>Posts tagged #rust</h1>
-<ul class="blog-list">
-    
-    <li class="post-card">
+
+<section class="tag-section">
+    <h2>Blog</h2>
+    <ul class="blog-list">
         
-        <a href="/blog/second-post/">Second Post</a>
-        <time>2024-06-01</time>
-        
-        
-        <ul class="tag-list">
+        <li class="post-card">
             
-            <li><a href="/tags/rust/">rust</a></li>
+            <a href="/blog/second-post/">Second Post</a>
+            <time>2024-06-01</time>
             
-            <li><a href="/tags/advanced/">advanced</a></li>
             
-        </ul>
-        
-    </li>
-    
-    <li class="post-card">
-        
-        <a href="/blog/first-post/">First Post</a>
-        <time>2024-01-01</time>
-        
-        
-        <ul class="tag-list">
+            <ul class="tag-list">
+                
+                <li><a href="/tags/rust/">rust</a></li>
+                
+                <li><a href="/tags/advanced/">advanced</a></li>
+                
+            </ul>
             
-            <li><a href="/tags/rust/">rust</a></li>
-            
-            <li><a href="/tags/tutorial/">tutorial</a></li>
-            
-        </ul>
+        </li>
         
-    </li>
-    
-</ul>
+        <li class="post-card">
+            
+            <a href="/blog/first-post/">First Post</a>
+            <time>2024-01-01</time>
+            
+            
+            <ul class="tag-list">
+                
+                <li><a href="/tags/rust/">rust</a></li>
+                
+                <li><a href="/tags/tutorial/">tutorial</a></li>
+                
+            </ul>
+            
+        </li>
+        
+    </ul>
+</section>
+
+
 
     </main>
