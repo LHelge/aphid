@@ -8,4 +8,5 @@ pub use page::{Page, PageKind, PageView};
 pub use site::HomePage;
 pub use site::NotFoundPage;
 pub use site::Site;
+pub use site::WikiIntroPage;
 pub use slug::Slug;

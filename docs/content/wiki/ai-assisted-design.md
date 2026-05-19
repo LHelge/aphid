@@ -181,7 +181,7 @@ Renders a single wiki page. Has many of the same variables as `blog_post.html`, 
 |----------|------|-------------|
 | `category` | string | Category name. Falls back to `wiki_default_category` (default `"Other"`) when frontmatter omits it, so always non-empty |
 | `backlinks` | list | Pages linking here; each has `title` and `url` |
-| `wiki_categories` | list | All wiki pages grouped by category — for a sidebar. Each entry has `name` (string) and `pages` (list of `{title, url}`). Named categories listed in `wiki_categories` config appear first, then alphabetical; the default catch-all group sorts last. |
+| `wiki_categories` | list | All wiki pages grouped by category — for a sidebar. Each entry has `name` (string), `description` (string, optional), `icon` (string, optional — full `/static/…` path to an SVG), and `pages` (list of `{title, url}`). Named categories listed in `wiki_categories` config appear first, then alphabetical; the default catch-all group sorts last. |
 
 `author`, `image` are always absent on wiki pages. `created`, `updated`, `tags` are present
 only if set in frontmatter.
@@ -193,6 +193,8 @@ Renders the wiki listing at `/wiki/`.
 | Variable | Type | Description |
 |----------|------|-------------|
 | `categories` | list | Same shape as `wiki_categories` on `wiki_page.html` |
+| `wiki_intro` | object? | Present when `content/wiki.md` exists. Has `content` (string — rendered HTML, pass through `\| safe`). |
+| `contains_mermaid` | bool | `true` when `wiki.md` contains mermaid blocks. |
 
 ## page.html
 
@@ -322,7 +324,9 @@ Pages without an image still produce valid tags — they just drop the `og:image
 - `toc` entries can build a table of contents sidebar or in-page nav.
 - `backlinks` are most useful on wiki pages — show them in a footer or sidebar section.
 - `wiki_categories` on `wiki_page.html` enables a sidebar showing all wiki pages grouped by
-  category, with the current page highlighted (compare `page.url == url`).
+  category, with the current page highlighted (compare `page.url == url`). Each category
+  may also have `description` and `icon` for richer rendering.
+- `wiki_intro` on `wiki_index.html` renders an optional intro section above the category cards.
 - Test the theme against pages with: no image, no tags, no TOC, very long content, many
   backlinks, and the 404 page.
 - Ensure the layout is responsive — test at mobile, tablet, and desktop widths.

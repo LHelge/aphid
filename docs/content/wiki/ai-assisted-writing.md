@@ -66,7 +66,7 @@ Top-level fields used in content:
 - `source_dir` — content root (default `content`).
 - `static_dir` — static files root (default `static`).
 - `theme_dir` — theme directory (optional, defaults to the bundled theme).
-- `wiki_categories` — list of category names in display order.
+- `wiki_categories` — array-of-tables `[[wiki_categories]]` with `name` (required), `description` (optional), `icon` (optional — root-relative URL path, e.g. `"/static/category/foo.svg"`).
 - `wiki_default_category` — fallback category name (default `"Other"`).
 - `favicon`, `social_image` — site-wide assets.
 - `feed_limit` (default 20), `posts_per_page` (default 10), `reading_wpm` (default 200).
@@ -93,6 +93,26 @@ Wiki-links resolve across blog, wiki, and pages — any slug that exists anywher
 
 Prefer `[[page#section]]` over hand-written `/wiki/page/#section` markdown links — the wiki
 form is checked at build time.
+
+### Wiki-link conventions
+
+- **Use natural prose form for multi-word slugs.** Aphid slugifies the target text inside
+  `[[ ... ]]` (lowercase, spaces → hyphens, hyphens preserved), so write
+  `[[Getting started]]`, `[[API reference]]`, `[[My topic]]` instead of
+  `[[getting-started]]`, `[[api-reference]]`, etc. The rendered href and display text are
+  identical either way — display always comes from the target page's `title` frontmatter —
+  but the natural form reads better in source. Single-word slugs (`[[overview]]`,
+  `[[deploy]]`) are fine as-is.
+- **Never use `[[slug|display]]` inside a markdown table cell.** The `|` collides with the
+  table-cell separator and the link won't render. In tables, always use the bare form
+  `[[slug]]` (or `[[Natural form]]`) and let the target page's title supply the text.
+- **Outside tables, drop `|display` when the target page's title already reads naturally
+  in the sentence.** Keep `|display` only when the title is too verbose inline, when a
+  contextual phrase is genuinely useful (e.g. `[[deploy#ci|CI deployment]]`), or to keep
+  parallelism inside a list of short references.
+- **Keep wiki slugs (= filenames) short and contextual** — e.g. `deploy.md` rather than
+  `production-deployment-with-github-actions.md`. The descriptive form lives in the page's
+  `title` frontmatter, and the rest of the content makes the referent obvious.
 
 ## Images and static files
 

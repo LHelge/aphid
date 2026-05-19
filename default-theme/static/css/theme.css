@@ -357,3 +357,67 @@ pre.mermaid {
     color: #999;
     font-size: 0.85rem;
 }
+
+/* Wiki index cards */
+.wiki-intro {
+    color: #555;
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+}
+
+.wiki-categories {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.25rem;
+}
+
+.wiki-category-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.wiki-category-card:hover {
+    border-color: #b0b0b0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.wiki-category-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.wiki-category-header h2 {
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+.wiki-category-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.wiki-category-description {
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 0.75rem;
+    line-height: 1.5;
+}
+
+.wiki-category-pages {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.wiki-category-pages li a {
+    font-size: 0.85rem;
+}

@@ -5,8 +5,27 @@ source_dir = "content"
 static_dir = "static"
 theme_dir = "theme"
 favicon = "static/favicon.png"
-wiki_categories = ["Getting Started", "Content", "Customization", "Development"]
 social_image = "/static/social.png"
+
+[[wiki_categories]]
+name = "Getting Started"
+description = "Installation, configuration, and first steps with aphid."
+icon = "/static/wiki/getting-started.svg"
+
+[[wiki_categories]]
+name = "Content"
+description = "Writing blog posts, wiki pages, and standalone pages."
+icon = "/static/wiki/content.svg"
+
+[[wiki_categories]]
+name = "Customization"
+description = "Themes, templates, and making your site your own."
+icon = "/static/wiki/customization.svg"
+
+[[wiki_categories]]
+name = "Development"
+description = "Contributing to aphid and local development setup."
+icon = "/static/wiki/development.svg"
 
 [[authors]]
 name = "LHelge"

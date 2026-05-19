@@ -153,8 +153,13 @@ impl<'a> MarkdownRenderer<'a> {
             .not_found
             .as_ref()
             .map(|n| (n, self.render(&n.body)));
+        let wiki_intro = self
+            .site
+            .wiki_intro
+            .as_ref()
+            .map(|w| (w, self.render(&w.body)));
 
-        RenderedSite::from_parts(self.site, blog, wiki, pages, home, not_found)
+        RenderedSite::from_parts(self.site, blog, wiki, pages, home, not_found, wiki_intro)
     }
 }
 

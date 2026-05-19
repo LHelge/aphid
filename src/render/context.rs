@@ -326,6 +326,8 @@ impl From<&Page<WikiFrontmatter>> for WikiEntry {
 #[derive(Debug, Clone, Serialize)]
 pub struct WikiCategory {
     pub name: String,
+    pub description: Option<String>,
+    pub icon: Option<String>,
     pub pages: Vec<WikiEntry>,
 }
 
@@ -337,11 +339,15 @@ enum WikiCategoryOrder {
 }
 
 impl WikiCategoryOrder {
-    fn from_name(name: &str, default_name: &str, configured_order: &[String]) -> Self {
+    fn from_name(
+        name: &str,
+        default_name: &str,
+        configured_order: &[crate::config::WikiCategoryConfig],
+    ) -> Self {
         if name == default_name {
             return Self::Default;
         }
-        match configured_order.iter().position(|c| c == name) {
+        match configured_order.iter().position(|c| c.name == name) {
             Some(i) => Self::Configured(i),
             None => Self::Alphabetical(name.to_owned()),
         }
@@ -374,11 +380,38 @@ impl WikiCategory {
         let order = &site.config.wiki_categories;
         let mut categories: Vec<Self> = by_category
             .into_iter()
-            .map(|(name, pages)| Self { name, pages })
+            .map(|(name, pages)| {
+                let cfg = order.iter().find(|c| c.name == name);
+                let description = cfg.and_then(|c| c.description.clone());
+                let icon = cfg.and_then(|c| c.icon.clone());
+                Self {
+                    name,
+                    description,
+                    icon,
+                    pages,
+                }
+            })
             .collect();
         categories
             .sort_by_cached_key(|cat| WikiCategoryOrder::from_name(&cat.name, default, order));
         categories
+    }
+}
+
+/// Rendered wiki intro content from `content/wiki.md`, exposed to the
+/// `wiki_index.html` template under the `wiki_intro` variable. Same
+/// shape as [`HomeContent`] — themes use it as
+/// `{% if wiki_intro %}{{ wiki_intro.content | safe }}{% endif %}`.
+#[derive(Debug, Clone, Serialize)]
+pub struct WikiIntroContent {
+    pub content: String,
+}
+
+impl From<&Rendered> for WikiIntroContent {
+    fn from(rendered: &Rendered) -> Self {
+        Self {
+            content: rendered.html.clone(),
+        }
     }
 }
 
@@ -388,6 +421,8 @@ pub struct WikiIndexContext {
     #[serde(flatten)]
     pub site: SiteContext,
     pub categories: Vec<WikiCategory>,
+    pub wiki_intro: Option<WikiIntroContent>,
+    pub contains_mermaid: bool,
 }
 
 /// Context for a single tag page. Posts with the tag are split into a
@@ -705,7 +740,14 @@ mod tests {
 
     fn site_with_wiki(wiki_categories: &[&str], pages: Vec<Page<WikiFrontmatter>>) -> Site {
         let mut config: Config = "title = \"T\"\nbase_url = \"http://x\"".parse().unwrap();
-        config.wiki_categories = wiki_categories.iter().map(|s| (*s).to_owned()).collect();
+        config.wiki_categories = wiki_categories
+            .iter()
+            .map(|s| crate::config::WikiCategoryConfig {
+                name: (*s).to_owned(),
+                description: None,
+                icon: None,
+            })
+            .collect();
         Site::from_parts(config, vec![], pages, vec![]).unwrap()
     }
 
