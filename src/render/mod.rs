@@ -284,9 +284,14 @@ impl<'a> Renderer<'a> {
             pages.insert(url, self.render_template("blog_index.html", &blog_ctx)?);
         }
 
+        let wiki_intro_rendered = rendered.wiki_intro().map(|(_, r)| r);
+        let wiki_intro_content = wiki_intro_rendered.map(WikiIntroContent::from);
+        let wiki_contains_mermaid = wiki_intro_rendered.is_some_and(|r| r.contains_mermaid);
         let wiki_ctx = WikiIndexContext {
             site: site_ctx.clone(),
             categories: wiki_categories.to_vec(),
+            wiki_intro: wiki_intro_content,
+            contains_mermaid: wiki_contains_mermaid,
         };
         pages.insert(
             "/wiki/".into(),

@@ -41,6 +41,18 @@ fn default_reading_wpm() -> u32 {
     200
 }
 
+/// A structured wiki category entry in `aphid.toml`. Defines ordering,
+/// display metadata (description, icon) for the wiki index page.
+#[derive(Debug, Clone, Deserialize)]
+pub struct WikiCategoryConfig {
+    pub name: String,
+    /// One or two sentences describing this category.
+    pub description: Option<String>,
+    /// Root-relative URL path to an SVG icon
+    /// (e.g. `"/static/category/getting-started.svg"`).
+    pub icon: Option<String>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub title: String,
@@ -63,9 +75,10 @@ pub struct Config {
     /// Explicit ordering for wiki category headings. Categories listed here
     /// appear in this order; any wiki category not listed falls through to
     /// alphabetical placement after the listed ones, with uncategorised pages
-    /// last.
+    /// last. Each entry can carry an optional description and icon for the
+    /// wiki index.
     #[serde(default)]
-    pub wiki_categories: Vec<String>,
+    pub wiki_categories: Vec<WikiCategoryConfig>,
     /// Display name used for wiki pages without a `category` in frontmatter.
     /// Surfaces both as the page's own category label and as the heading
     /// for the catch-all group on the wiki index. Defaults to `"Other"`.

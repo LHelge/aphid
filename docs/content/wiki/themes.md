@@ -125,7 +125,7 @@ Universal page variables, plus:
 |----------|------|-------------|
 | `category` | string | Category for this page. Falls back to `wiki_default_category` (default `"Other"`) when frontmatter omits it, so always non-empty |
 | `backlinks` | list | Pages that link here via `[[wiki-link]]`. Each has `title` and `url` |
-| `wiki_categories` | list | All wiki pages grouped by category — for rendering a sidebar with the current page highlighted (compare `page.url == url`). Each entry has `name` (string) and `pages` (list of `{title, url}`). Named categories come first in `wiki_categories` order, then alphabetical; the default catch-all group sorts last. |
+| `wiki_categories` | list | All wiki pages grouped by category — for rendering a sidebar with the current page highlighted (compare `page.url == url`). Each entry has `name` (string), `description` (string, optional), `icon` (string, optional — full `/static/…` path), and `pages` (list of `{title, url}`). Named categories come first in `wiki_categories` order, then alphabetical; the default catch-all group sorts last. |
 
 ## page.html
 
@@ -169,7 +169,9 @@ Each entry in `posts` (and on `tag.html`) has:
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `categories` | list | All wiki pages grouped by category. Each entry has `name` (string) and `pages` (list of `{title, url}`). Named categories come first in `wiki_categories` order, then alphabetical; the default catch-all group (`wiki_default_category`, default `"Other"`) sorts last. |
+| `categories` | list | All wiki pages grouped by category. Each entry has `name` (string), `description` (string, optional), `icon` (string, optional — full `/static/…` path to an SVG), and `pages` (list of `{title, url}`). Named categories come first in `wiki_categories` order, then alphabetical; the default catch-all group (`wiki_default_category`, default `"Other"`) sorts last. |
+| `wiki_intro` | object? | Present when `content/wiki.md` exists. Has `content` (string, the rendered HTML — pass through `\| safe`). |
+| `contains_mermaid` | bool | `true` when `wiki.md` contains at least one ` ```mermaid ` block. |
 
 ## tag.html
 

@@ -1,5 +1,6 @@
 use crate::content::{
     BlogFrontmatter, HomePage, NotFoundPage, Page, PageFrontmatter, Site, Slug, WikiFrontmatter,
+    WikiIntroPage,
 };
 
 use super::Rendered;
@@ -21,6 +22,7 @@ pub struct RenderedSite<'a> {
     pages: Vec<(&'a Page<PageFrontmatter>, Rendered)>,
     home: Option<(&'a HomePage, Rendered)>,
     not_found: Option<(&'a NotFoundPage, Rendered)>,
+    wiki_intro: Option<(&'a WikiIntroPage, Rendered)>,
     diagnostics: Diagnostics,
 }
 
@@ -35,9 +37,16 @@ impl<'a> RenderedSite<'a> {
         pages: Vec<(&'a Page<PageFrontmatter>, Rendered)>,
         home: Option<(&'a HomePage, Rendered)>,
         not_found: Option<(&'a NotFoundPage, Rendered)>,
+        wiki_intro: Option<(&'a WikiIntroPage, Rendered)>,
     ) -> Self {
-        let diagnostics =
-            Diagnostics::collect(&blog, &wiki, &pages, home.as_ref(), not_found.as_ref());
+        let diagnostics = Diagnostics::collect(
+            &blog,
+            &wiki,
+            &pages,
+            home.as_ref(),
+            not_found.as_ref(),
+            wiki_intro.as_ref(),
+        );
         Self {
             site,
             blog,
@@ -45,6 +54,7 @@ impl<'a> RenderedSite<'a> {
             pages,
             home,
             not_found,
+            wiki_intro,
             diagnostics,
         }
     }
@@ -73,6 +83,10 @@ impl<'a> RenderedSite<'a> {
         self.not_found.as_ref().map(|(n, r)| (*n, r))
     }
 
+    pub fn wiki_intro(&self) -> Option<(&WikiIntroPage, &Rendered)> {
+        self.wiki_intro.as_ref().map(|(w, r)| (*w, r))
+    }
+
     pub fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
@@ -97,6 +111,7 @@ impl Diagnostics {
         pages: &[(&Page<PageFrontmatter>, Rendered)],
         home: Option<&(&HomePage, Rendered)>,
         not_found: Option<&(&NotFoundPage, Rendered)>,
+        wiki_intro: Option<&(&WikiIntroPage, Rendered)>,
     ) -> Self {
         let mut broken_wiki_links = Vec::new();
 
@@ -125,6 +140,7 @@ impl Diagnostics {
         for (source, rendered) in [
             home.map(|(_, r)| (DiagnosticSource::Home, r)),
             not_found.map(|(_, r)| (DiagnosticSource::NotFound, r)),
+            wiki_intro.map(|(_, r)| (DiagnosticSource::WikiIntro, r)),
         ]
         .into_iter()
         .flatten()
@@ -156,6 +172,7 @@ pub enum DiagnosticSource {
     Page(Slug),
     Home,
     NotFound,
+    WikiIntro,
 }
 
 impl std::fmt::Display for DiagnosticSource {
@@ -164,6 +181,7 @@ impl std::fmt::Display for DiagnosticSource {
             Self::Page(slug) => write!(f, "{slug}"),
             Self::Home => write!(f, "home.md"),
             Self::NotFound => write!(f, "404.md"),
+            Self::WikiIntro => write!(f, "wiki.md"),
         }
     }
 }

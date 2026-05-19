@@ -46,6 +46,23 @@ impl NotFoundPage {
     }
 }
 
+/// Optional wiki-index intro content loaded from `content/wiki.md`. Renders
+/// above the category cards on the `wiki_index.html` template. Same loading
+/// and pipeline rules as [`HomePage`]: plain markdown, no frontmatter, full
+/// markdown pipeline (wiki-links, headings, highlight, mermaid).
+pub struct WikiIntroPage {
+    pub body: String,
+    pub path: PathBuf,
+}
+
+impl WikiIntroPage {
+    /// Load `wiki.md` from `path` if it exists. Same semantics as
+    /// [`HomePage::load`].
+    fn load(path: &Path) -> Result<Option<Self>, Error> {
+        Ok(load_bodyless(path)?.map(|(body, path)| Self { body, path }))
+    }
+}
+
 /// Shared read-helper for `home.md` / `404.md` style files: plain markdown,
 /// no frontmatter. Returns `Ok(None)` if the file is absent. Lives as a free
 /// function because the result `(body, path)` doesn't belong to either type
@@ -84,6 +101,8 @@ pub struct Site {
     pub home: Option<HomePage>,
     /// Optional 404-page content loaded from `<source_dir>/404.md`.
     pub not_found: Option<NotFoundPage>,
+    /// Optional wiki-index intro loaded from `<source_dir>/wiki.md`.
+    pub wiki_intro: Option<WikiIntroPage>,
     /// Index of every slug across blog/wiki/pages — supports `[[wiki-link]]`
     /// resolution. Crate-private; use [`Site::get`] to look up.
     pub(crate) slug_index: HashMap<Slug, (PageKind, usize)>,
@@ -232,6 +251,7 @@ impl Site {
         })?;
         let home = HomePage::load(&src.join("home.md"))?;
         let not_found = NotFoundPage::load(&src.join("404.md"))?;
+        let wiki_intro = WikiIntroPage::load(&src.join("wiki.md"))?;
 
         for page in &mut wiki {
             if page.frontmatter.title.is_empty() {
@@ -248,6 +268,7 @@ impl Site {
         let mut site = Self::from_parts(config, blog, wiki, pages)?;
         site.home = home;
         site.not_found = not_found;
+        site.wiki_intro = wiki_intro;
         Ok(site)
     }
 
@@ -270,6 +291,7 @@ impl Site {
             pages,
             home: None,
             not_found: None,
+            wiki_intro: None,
             slug_index,
             tag_index,
             backlinks,
@@ -481,6 +503,7 @@ mod tests {
             pages: vec![make_standalone_page("about")],
             home: None,
             not_found: None,
+            wiki_intro: None,
             slug_index,
             tag_index: HashMap::new(),
             backlinks: HashMap::new(),

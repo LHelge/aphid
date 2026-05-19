@@ -3,31 +3,34 @@
 {% block page_title %}Docs — {{ site_title }}{% endblock page_title %}
 
 {% block content %}
-<div class="wiki-layout">
-  <nav class="wiki-sidebar">
+<div class="wiki-main">
+  <h1 class="page-heading">Documentation</h1>
+  {% if wiki_intro %}
+  <div class="wiki-intro">
+  {{ wiki_intro.content | safe }}
+  </div>
+  {% endif %}
+  <div class="wiki-cat-grid">
     {% for category in categories %}
-    <div class="wiki-cat">
-      <div class="wiki-cat-name">{{ category.name }}</div>
-      {% for page in category.pages %}
-      <a href="{{ page.url }}" class="wiki-cat-link">{{ page.title }}</a>
-      {% endfor %}
-    </div>
-    {% endfor %}
-  </nav>
-
-  <div class="wiki-main">
-    <h1 class="page-heading">Documentation</h1>
-    <p class="page-subheading">Select a topic from the sidebar, or browse by category:</p>
-    <div class="wiki-cat-grid">
-      {% for category in categories %}
-      {% if category.pages | length > 0 %}
-      <a href="{{ category.pages.0.url }}" class="wiki-cat-card">
+    {% if category.pages | length > 0 %}
+    <div class="wiki-cat-card">
+      <div class="wiki-cat-card-header">
+        {% if category.icon %}
+        <img class="wiki-cat-card-icon" src="{{ category.icon | safe }}" alt="">
+        {% endif %}
         <div class="wiki-cat-card-name">{{ category.name }}</div>
-        <div class="wiki-cat-card-count">{{ category.pages | length }} page{% if category.pages | length != 1 %}s{% endif %}</div>
-      </a>
+      </div>
+      {% if category.description %}
+      <p class="wiki-cat-card-description">{{ category.description }}</p>
       {% endif %}
-      {% endfor %}
+      <ul class="wiki-cat-card-pages">
+        {% for page in category.pages %}
+        <li><a href="{{ page.url }}">{{ page.title }}</a></li>
+        {% endfor %}
+      </ul>
     </div>
+    {% endif %}
+    {% endfor %}
   </div>
 </div>
 {% endblock content %}
