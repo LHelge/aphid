@@ -192,7 +192,7 @@ fn stem(path: &Path) -> String {
 
 fn load_dir<F, S>(dir: &Path, to_slug: S) -> Result<Vec<Page<F>>, Error>
 where
-    F: DeserializeOwned,
+    F: DeserializeOwned + 'static,
     S: Fn(&F, &Path) -> String,
 {
     if !dir.is_dir() {
