@@ -14,35 +14,35 @@ exclude = ["docs/", "CLAUDE.md", ".github/", ".claude/"]
 
 [dependencies]
 axum = { version = "0.8.9", features = ["ws"] }
-chrono = { version = "0.4.44", features = ["serde"] }
-clap = { version = "4.6.1", features = ["derive"] }
-image = "0.25.9"
-notify = "8.2.0"
-pulldown-cmark = "0.13.3"
-quick-xml = "0.39.2"
+chrono = { version = "0.4.45", features = ["serde"] }
+clap = { version = "4.6.7", features = ["derive"] }
+image = "0.25.10"
+notify = "8.2.2"
+pulldown-cmark = "0.13.6"
+quick-xml = "0.42.0"
 rayon = "1.12.0"
-regex = "1.12.3"
-resvg = "0.45.1"
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"
-serde_yml = "0.0.12"
+regex = "1.13.1"
+resvg = "0.50.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+serde_yml = "0.0.13"
 syntect = "5.3.0"
 tera = "1.20.1"
-thiserror = "2.0.18"
-tokio = { version = "1.52.1", features = ["full"] }
-toml = "1.1.2"
-tower-http = { version = "0.6.8", features = ["fs", "set-header"] }
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["full"] }
+toml = "1.2.1"
+tower-http = { version = "0.7.1", features = ["fs", "set-header"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 url = { version = "2.5.8", features = ["serde"] }
 
 [dev-dependencies]
-futures-util = "0.3.32"
-image = "0.25.9"
-insta = "1.47.2"
-reqwest = "0.13.2"
+futures-util = "0.3.34"
+image = "0.25.10"
+insta = "1.49.0"
+reqwest = "0.13.5"
 tempfile = "3.27.0"
-tokio-tungstenite = "0.29.0"
+tokio-tungstenite = "0.30.0"
 walkdir = "2.5.0"
 
 [workspace]

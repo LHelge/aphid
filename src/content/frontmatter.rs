@@ -64,7 +64,7 @@ pub struct PageFrontmatter {
 ///
 /// Returns `(frontmatter, body)` where `body` is the content after the
 /// closing `---` delimiter, with leading whitespace stripped.
-pub fn parse<F: DeserializeOwned>(input: &str) -> Result<(F, String), Error> {
+pub fn parse<F: DeserializeOwned + 'static>(input: &str) -> Result<(F, String), Error> {
     let mut opts = Options::empty();
     opts.insert(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS);
 
