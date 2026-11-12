@@ -3,14 +3,25 @@ use std::{net::SocketAddr, time::Instant};
 use axum::{
     body::{Body, HttpBody},
     extract::{ConnectInfo, Request},
-    http::{HeaderMap, Method, header},
+    http::{HeaderMap, Method, Version, header},
     middleware::Next,
     response::Response,
 };
+use opentelemetry::global;
+use opentelemetry_http::HeaderExtractor;
+use tracing::{Instrument, Span, field::Empty};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::server::HEALTHZ_PATH;
 
-/// Per-request access log: one `info` event per request, except health checks.
+/// Target of the per-request server span.
+pub(crate) const HTTP_SPAN_TARGET: &str = "aphid_server::http";
+/// Target of the per-request access-log event.
+pub(crate) const ACCESS_LOG_TARGET: &str = "aphid_server::access";
+
+/// Per-request instrumentation: a server span (exported as an OTel span when
+/// OTLP is enabled) and one `info` access-log event inside it. Health checks
+/// get neither.
 pub struct AccessLog;
 
 impl AccessLog {
@@ -21,9 +32,10 @@ impl AccessLog {
         }
 
         let entry = AccessLogEntry::from_request(&request);
+        let span = entry.span(request.headers());
         let start = Instant::now();
-        let response = next.run(request).await;
-        entry.record(&response, start);
+        let response = next.run(request).instrument(span.clone()).await;
+        span.in_scope(|| entry.record(&span, &response, start));
         response
     }
 }
@@ -31,8 +43,11 @@ impl AccessLog {
 struct AccessLogEntry {
     method: Method,
     path: String,
+    query: Option<String>,
+    version: Version,
     referrer: Option<String>,
     user_agent: Option<String>,
+    peer: Option<String>,
     client: Option<String>,
 }
 
@@ -46,18 +61,75 @@ impl AccessLogEntry {
         Self {
             method: request.method().clone(),
             path: request.uri().path().to_owned(),
+            query: request.uri().query().map(str::to_owned),
+            version: request.version(),
             referrer: header_str(headers, header::REFERER),
             user_agent: header_str(headers, header::USER_AGENT),
-            client: forwarded_for(headers).or(peer),
+            client: forwarded_for(headers).or_else(|| peer.clone()),
+            peer,
         }
     }
 
-    fn record(self, response: &Response, start: Instant) {
+    /// The server span, named and attributed per the OpenTelemetry HTTP
+    /// semantic conventions, continuing an incoming W3C `traceparent`.
+    fn span(&self, headers: &HeaderMap) -> Span {
+        let span = tracing::info_span!(
+            target: HTTP_SPAN_TARGET,
+            "HTTP request",
+            otel.name = %self.method,
+            otel.kind = "server",
+            otel.status_code = Empty,
+            http.request.method = %self.method,
+            http.response.status_code = Empty,
+            http.response.body.size = Empty,
+            url.path = %self.path,
+            url.query = Empty,
+            url.scheme = "http",
+            network.protocol.version = Empty,
+            network.peer.address = Empty,
+            client.address = Empty,
+            user_agent.original = Empty,
+        );
+        if let Some(query) = &self.query {
+            span.record("url.query", query.as_str());
+        }
+        if let Some(version) = protocol_version(self.version) {
+            span.record("network.protocol.version", version);
+        }
+        if let Some(peer) = &self.peer {
+            span.record("network.peer.address", peer.as_str());
+        }
+        if let Some(client) = &self.client {
+            span.record("client.address", client.as_str());
+        }
+        if let Some(user_agent) = &self.user_agent {
+            span.record("user_agent.original", user_agent.as_str());
+        }
+
+        let parent = global::get_text_map_propagator(|p| p.extract(&HeaderExtractor(headers)));
+        // Fails only when no OpenTelemetry layer is installed; nothing to do then.
+        let _ = span.set_parent(parent);
+        span
+    }
+
+    fn record(self, span: &Span, response: &Response, start: Instant) {
         let status = response.status().as_u16();
         let bytes = self.response_bytes(response);
         let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
+
+        // tracing-opentelemetry exports unsigned integers as strings; semconv
+        // wants integers, so record these as i64.
+        span.record("http.response.status_code", i64::from(status));
+        span.record(
+            "http.response.body.size",
+            i64::try_from(bytes).unwrap_or(i64::MAX),
+        );
+        if response.status().is_server_error() {
+            span.record("otel.status_code", "ERROR");
+        }
+
         tracing::info!(
-            target: "aphid_server::access",
+            target: ACCESS_LOG_TARGET,
             method = %self.method,
             path = %self.path,
             status,
@@ -83,6 +155,17 @@ impl AccessLogEntry {
             .and_then(|v| v.parse().ok())
             .or_else(|| response.body().size_hint().exact())
             .unwrap_or(0)
+    }
+}
+
+fn protocol_version(version: Version) -> Option<&'static str> {
+    match version {
+        Version::HTTP_09 => Some("0.9"),
+        Version::HTTP_10 => Some("1.0"),
+        Version::HTTP_11 => Some("1.1"),
+        Version::HTTP_2 => Some("2"),
+        Version::HTTP_3 => Some("3"),
+        _ => None,
     }
 }
 
