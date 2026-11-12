@@ -22,7 +22,7 @@ fn main() -> ExitCode {
             runtime.block_on(async {
                 Server::bind(&config)
                     .await?
-                    .run(Server::shutdown_signal())
+                    .run(Server::shutdown_signal()?)
                     .await
             })
         });
