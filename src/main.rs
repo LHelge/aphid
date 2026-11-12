@@ -15,7 +15,13 @@ async fn main() -> Result<(), Error> {
 
     let cli = Cli::parse();
     match cli.command.unwrap_or(Command::Serve { port: 3000 }) {
-        Command::Build { output } => aphid::build(&cli.config, &output).await,
+        Command::Build {
+            output,
+            precompress,
+        } => {
+            let options = aphid::BuildOptions::default().precompress(precompress);
+            aphid::build_with(&cli.config, &output, options).await
+        }
         Command::Serve { port } => aphid::serve(&cli.config, port).await,
         Command::New { name, agent } => aphid::scaffold_new(&name, agent),
         Command::Init { path, agent } => aphid::scaffold_init(

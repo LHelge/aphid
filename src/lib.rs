@@ -38,6 +38,7 @@ pub mod favicon;
 mod html;
 pub mod markdown;
 pub mod output;
+mod precompress;
 pub mod render;
 pub mod scaffold;
 pub mod serve;
@@ -45,19 +46,47 @@ pub mod serve;
 pub mod testutil;
 
 pub use error::Error;
+pub use precompress::PrecompressStats;
 
 use std::path::Path;
 
 use config::Config;
 use render::{BuiltSite, Theme};
 
-/// Build the site into the given output directory.
+/// Options for [`build_with`].
+#[derive(Debug, Default, Clone, Copy)]
+#[non_exhaustive]
+pub struct BuildOptions {
+    /// Also write brotli (`.br`) and gzip (`.gz`) variants of text files, for
+    /// servers that can send them as they are (`aphid-server` does).
+    pub precompress: bool,
+}
+
+impl BuildOptions {
+    /// Set [`precompress`](Self::precompress).
+    pub fn precompress(mut self, precompress: bool) -> Self {
+        self.precompress = precompress;
+        self
+    }
+}
+
+/// Build the site into the given output directory, with default
+/// [`BuildOptions`].
 ///
 /// Broken `[[wiki-links]]` are fatal here: any diagnostics produced during
 /// pass 1 are converted into [`Error::BrokenWikiLinks`] before any output
 /// is written. The dev server applies a different policy — see
 /// [`serve`].
 pub async fn build(config_path: &Path, output_dir: &Path) -> Result<(), Error> {
+    build_with(config_path, output_dir, BuildOptions::default()).await
+}
+
+/// [`build`], with options.
+pub async fn build_with(
+    config_path: &Path,
+    output_dir: &Path,
+    options: BuildOptions,
+) -> Result<(), Error> {
     let config = Config::from_path(config_path)?;
 
     let theme = Theme::load(&config)?;
@@ -73,6 +102,15 @@ pub async fn build(config_path: &Path, output_dir: &Path) -> Result<(), Error> {
     tracing::info!(output = %output_dir.display(), "writing output");
     let writer = output::OutputWriter::new(output_dir)?;
     writer.write(&built, &theme, &config.static_dir)?;
+
+    if options.precompress {
+        let stats = writer.precompress()?;
+        tracing::info!(
+            files = stats.files,
+            variants = stats.variants,
+            "precompressed text files"
+        );
+    }
 
     tracing::info!("build complete");
     Ok(())

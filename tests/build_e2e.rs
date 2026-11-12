@@ -436,3 +436,39 @@ fn append_config(config_path: &std::path::Path, extra: &str) {
     content.push('\n');
     fs::write(config_path, content).unwrap();
 }
+
+#[tokio::test]
+async fn precompress_writes_variants_next_to_originals() {
+    let (dir, config_path) = common::setup_with_shared_fixtures_and_style();
+    write_file(
+        &dir.path().join("static/big.css"),
+        &"body { margin: 0; }\n".repeat(200),
+    );
+    let output = dir.path().join("dist");
+
+    let options = aphid::BuildOptions::default().precompress(true);
+    aphid::build_with(&config_path, &output, options)
+        .await
+        .unwrap();
+
+    let original = output.join("static/big.css");
+    let plain = fs::metadata(&original).unwrap().len();
+    for suffix in ["br", "gz"] {
+        let variant = output.join(format!("static/big.css.{suffix}"));
+        let size = fs::metadata(&variant).unwrap().len();
+        assert!(size < plain, "{suffix}: {size} >= {plain}");
+    }
+    // Rendered pages get variants too.
+    assert!(output.join("index.html.br").exists());
+}
+
+#[tokio::test]
+async fn build_writes_no_variants_by_default() {
+    let (_dir, output) = build_fixture_site().await;
+    let compressed = walkdir::WalkDir::new(&output)
+        .into_iter()
+        .map(|e| e.unwrap().into_path())
+        .filter(|p| matches!(p.extension().and_then(|e| e.to_str()), Some("br" | "gz")))
+        .count();
+    assert_eq!(compressed, 0);
+}

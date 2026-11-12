@@ -17,6 +17,10 @@ inputs:
     description: 'Output directory for the built site'
     required: false
     default: 'dist'
+  precompress:
+    description: 'Also write .br and .gz variants of text files, for aphid-server (needs an aphid release with `build --precompress`)'
+    required: false
+    default: 'false'
 
 outputs:
   version:
@@ -73,4 +77,9 @@ runs:
 
     - name: Build site
       shell: bash
-      run: aphid --config "${{ inputs.config }}" build --output "${{ inputs.output }}"
+      run: |
+        args=()
+        if [ "${{ inputs.precompress }}" = "true" ]; then
+          args+=(--precompress)
+        fi
+        aphid --config "${{ inputs.config }}" build --output "${{ inputs.output }}" "${args[@]}"

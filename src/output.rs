@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::Error;
+use crate::precompress::{PrecompressStats, Precompressor};
 use crate::render::{BuiltSite, Theme};
 
 /// Recursively copy all files from `src` into `dest`, preserving directory
@@ -68,6 +69,12 @@ impl OutputWriter {
         tracing::info!("copying static files");
         self.copy_static(theme, user_static)?;
         Ok(())
+    }
+
+    /// Write `.br` and `.gz` siblings next to the text files already in the
+    /// output directory. Call after [`write`](Self::write).
+    pub fn precompress(&self) -> Result<PrecompressStats, Error> {
+        Precompressor::run(&self.dir)
     }
 
     /// Write rendered HTML to `{dir}/{url_path}/index.html`. The root path
