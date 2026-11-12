@@ -24,6 +24,20 @@ pub struct Config {
     /// Log filter, e.g. `info` or `info,aphid_server=debug`.
     #[arg(long, env = "APHID_LOG_LEVEL", default_value = "info")]
     pub log_level: String,
+
+    /// OTLP/HTTP base URL (e.g. `http://collector:4318`). Enables OpenTelemetry
+    /// trace and log export; without it nothing is exported.
+    #[arg(long, env = "OTEL_EXPORTER_OTLP_ENDPOINT")]
+    pub otlp_endpoint: Option<String>,
+}
+
+impl Config {
+    /// The configured OTLP endpoint, treating an empty value as unset.
+    pub fn otlp_endpoint(&self) -> Option<&str> {
+        self.otlp_endpoint
+            .as_deref()
+            .filter(|e| !e.trim().is_empty())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]

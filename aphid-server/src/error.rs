@@ -10,6 +10,8 @@ pub enum Error {
     RootNotDirectory(PathBuf),
     #[error("invalid log level: {0}")]
     LogLevel(#[from] tracing_subscriber::filter::ParseError),
+    #[error("OpenTelemetry exporter: {0}")]
+    Otlp(#[from] opentelemetry_otlp::ExporterBuildError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
