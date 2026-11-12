@@ -15,11 +15,11 @@ It is not the dev server: there is no file watching and no live reload. For writ
 Build the site into `dist/` with `aphid build --precompress` (or the GitHub Action from [[deployment]] with `precompress: true`), then:
 
 ```dockerfile
-FROM ghcr.io/lhelge/aphid-server:0.4.1
+FROM ghcr.io/lhelge/aphid-server:0.5.0
 COPY dist /site
 ```
 
-The image is `scratch` plus the binary (no shell, no CA bundle). It runs as the non-root user `65532`, listens on port 8080 and serves `/site`. Image tags follow aphid's releases (`0.4.1`, `0.4`, `latest`); pin an exact version.
+The image is `scratch` plus the binary (no shell, no CA bundle). It runs as the non-root user `65532`, listens on port 8080 and serves `/site`. Image tags follow aphid's releases (`0.5.0`, `0.5`, `latest`); pin an exact version.
 
 # What it serves
 
