@@ -1,0 +1,90 @@
+---
+title: Serving with aphid-server
+category: Getting Started
+tags:
+  - guide
+  - deployment
+---
+
+`aphid-server` is a small production web server for a site built with `aphid build`. It ships as a multi-arch container image, `ghcr.io/lhelge/aphid-server`, that already holds the server, so a site's image is two lines. It needs no configuration file, speaks plain HTTP/1.1, and is meant to run behind a reverse proxy that terminates TLS.
+
+It is not the dev server: there is no file watching and no live reload. For writing, use `aphid serve` (see [[dev-server]]).
+
+# The Dockerfile
+
+Build the site into `dist/` (for example with the GitHub Action from [[deployment]]), then:
+
+```dockerfile
+FROM ghcr.io/lhelge/aphid-server:0.4.0
+COPY dist /site
+```
+
+The image is based on `scratch`, runs as the non-root user `65532`, listens on port 8080 and serves `/site`. Image tags follow aphid's releases (`0.4.0`, `0.4`, `latest`); pin an exact version.
+
+# What it serves
+
+- Files from the root, with `index.html` for directories, content types by extension, `ETag`/`Last-Modified` revalidation (`304 Not Modified`) and byte-range requests.
+- A directory requested without a trailing slash redirects to the slashed path with a *relative* `Location` (`/posts` → `/posts/`), so the redirect stays on the public host and scheme behind a proxy.
+- Missing paths return status 404 with the site's `404.html` if there is one, a plain-text 404 otherwise.
+- `GET /healthz` returns 200 without touching the file system. It is never logged, and it takes precedence over a file with that name.
+- `..` segments, encoded or not, cannot escape the root.
+
+On `SIGTERM` or `SIGINT` it stops accepting connections, finishes in-flight requests and exits 0.
+
+# Options
+
+Every option is a flag or an environment variable; a flag wins over the environment.
+
+| Flag | Environment | Default | Description |
+|------|-------------|---------|-------------|
+| `--root` | `APHID_ROOT` | `/site` | Directory to serve |
+| `--port` | `PORT` | `8080` | Listen port, on all interfaces |
+| `--log-format` | `APHID_LOG_FORMAT` | `text` | `text` for humans, `json` for one JSON object per line |
+| `--log-level` | `APHID_LOG_LEVEL` | `info` | Log filter, e.g. `warn` or `info,aphid_server=debug` |
+| `--otlp-endpoint` | `OTEL_EXPORTER_OTLP_ENDPOINT` | unset | OTLP/HTTP base URL; enables OpenTelemetry export |
+
+# Logs
+
+Logs go to stdout. Every request except `/healthz` produces one `info` event with target `aphid_server::access` and the fields `method`, `path`, `status`, `duration_ms` (time to response headers), `bytes`, `referrer`, `user_agent` and `client` (the left-most `X-Forwarded-For` entry, else the peer address). With `--log-format json`:
+
+```json
+{"timestamp":"2026-11-12T10:24:14.440176Z","level":"INFO","message":"request","method":"GET","path":"/broken-link/","status":404,"duration_ms":0.44,"bytes":14,"referrer":"https://example.com/posts/","user_agent":"Mozilla/5.0 …","client":"203.0.113.7","target":"aphid_server::access"}
+```
+
+To find broken links, filter on the status and look at the referrer:
+
+```sh
+jq -c 'select(.status == 404) | {path, referrer}' server.log
+```
+
+# OpenTelemetry
+
+Setting `--otlp-endpoint` (or `OTEL_EXPORTER_OTLP_ENDPOINT`) exports traces and logs over OTLP/HTTP with protobuf. Without it, no exporter is started. Stdout logging is unchanged either way.
+
+- **Traces:** one server span per request (none for `/healthz`), named after the method and carrying the HTTP semantic-convention attributes (`http.request.method`, `url.path`, `http.response.status_code`, `client.address`, `user_agent.original`, …). An incoming W3C `traceparent` header is continued. Spans are exported whatever `--log-level` is.
+- **Logs:** log events that pass `--log-level` are exported as OTel log records, linked to the request's span.
+- **Configuration:** the endpoint is a base URL (`/v1/traces` and `/v1/logs` are appended). The standard variables `OTEL_SERVICE_NAME` (default `aphid-server`), `OTEL_RESOURCE_ATTRIBUTES`, `OTEL_EXPORTER_OTLP_HEADERS` and the per-signal `OTEL_EXPORTER_OTLP_{TRACES,LOGS}_ENDPOINT` are honoured. HTTPS endpoints work: the image includes CA certificates.
+- **Failure handling:** export runs in the background and drops data when the collector can't keep up. It never delays or fails a request. When export starts failing, one warning is logged, and one more line when it recovers. On shutdown, buffered telemetry is flushed for at most 3 seconds.
+
+# hoster
+
+With [hoster](https://github.com/LHelge/hoster), the site is an ordinary service. hoster injects `PORT=8080` and probes `GET /healthz` by default, and both work with no further setup:
+
+```toml
+version = 1
+name = "blog"
+
+[services.web]
+image = "ghcr.io/acme/blog"        # FROM ghcr.io/lhelge/aphid-server + COPY dist /site
+
+[services.web.env]
+APHID_LOG_FORMAT = "json"
+# Optional: export traces and logs to a collector on the stack network.
+# OTEL_EXPORTER_OTLP_ENDPOINT = "http://collector:4318"
+
+[[services.web.routes]]
+host = "blog.example.com"
+port = 8080
+```
+
+Put auth headers for a hosted collector in `[services.web.secrets]` as `OTEL_EXPORTER_OTLP_HEADERS`.
