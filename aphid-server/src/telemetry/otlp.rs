@@ -5,7 +5,7 @@ use std::{
 
 use opentelemetry::{Key, KeyValue, global, trace::TracerProvider as _};
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
-use opentelemetry_otlp::{Protocol, WithExportConfig};
+use opentelemetry_otlp::{Protocol, WithExportConfig, WithHttpConfig};
 use opentelemetry_sdk::{
     Resource,
     error::OTelSdkResult,
@@ -27,6 +27,7 @@ use crate::access_log::ACCESS_LOG_TARGET;
 use crate::{Result, access_log::HTTP_SPAN_TARGET};
 
 const DEFAULT_SERVICE_NAME: &str = "aphid-server";
+const DEFAULT_EXPORT_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Targets whose events must never become exported log records: the
 /// exporter's own HTTP stack and the SDK. Exporting them would feed back
@@ -59,8 +60,10 @@ impl OtlpPipeline {
     /// variables still win. Headers, timeouts and resource attributes come
     /// from the standard `OTEL_*` variables.
     pub(crate) fn from_endpoint(endpoint: &str) -> Result<Self> {
+        let client = Self::http_client()?;
         let spans = opentelemetry_otlp::SpanExporter::builder()
             .with_http()
+            .with_http_client(client.clone())
             .with_protocol(Protocol::HttpBinary);
         let spans = match Self::signal_endpoint(endpoint, "TRACES", "v1/traces") {
             Some(url) => spans.with_endpoint(url),
@@ -70,6 +73,7 @@ impl OtlpPipeline {
 
         let logs = opentelemetry_otlp::LogExporter::builder()
             .with_http()
+            .with_http_client(client)
             .with_protocol(Protocol::HttpBinary);
         let logs = match Self::signal_endpoint(endpoint, "LOGS", "v1/logs") {
             Some(url) => logs.with_endpoint(url),
@@ -151,6 +155,28 @@ impl OtlpPipeline {
                 "OpenTelemetry flush on shutdown incomplete; some telemetry was dropped"
             );
         }
+    }
+
+    /// The blocking HTTP client both exporters share. HTTPS endpoints are
+    /// verified against Mozilla's root store compiled into the binary
+    /// (`webpki-root-certs`), so the `scratch` image needs no CA bundle.
+    /// The timeout mirrors the SDK default: `OTEL_EXPORTER_OTLP_TIMEOUT`
+    /// milliseconds, else 10 s.
+    ///
+    /// Must be built outside the tokio runtime (see [`Telemetry::init`]).
+    fn http_client() -> Result<reqwest::blocking::Client> {
+        let timeout = std::env::var("OTEL_EXPORTER_OTLP_TIMEOUT")
+            .ok()
+            .and_then(|ms| ms.trim().parse().ok())
+            .map_or(DEFAULT_EXPORT_TIMEOUT, Duration::from_millis);
+        let roots = webpki_root_certs::TLS_SERVER_ROOT_CERTS
+            .iter()
+            .map(|der| reqwest::Certificate::from_der(der))
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(reqwest::blocking::Client::builder()
+            .timeout(timeout)
+            .tls_certs_only(roots)
+            .build()?)
     }
 
     fn signal_endpoint(base: &str, signal: &str, path: &str) -> Option<String> {

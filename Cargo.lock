@@ -156,6 +156,7 @@ dependencies = [
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
+ "webpki-root-certs",
 ]
 
 [[package]]
