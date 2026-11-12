@@ -142,8 +142,9 @@ impl AccessLogEntry {
         );
     }
 
-    /// Body bytes sent: `Content-Length` where present, the body's exact size
-    /// otherwise, and zero for `HEAD` (which never carries a body).
+    /// Body size before compression: `Content-Length` where present, the
+    /// body's exact size otherwise, and zero for `HEAD` (which never carries a
+    /// body).
     fn response_bytes(&self, response: &Response<Body>) -> u64 {
         if self.method == Method::HEAD {
             return 0;

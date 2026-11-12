@@ -20,7 +20,7 @@ opentelemetry_sdk = "0.33.1"
 reqwest = { version = "0.13.5", default-features = false, features = ["blocking", "rustls"] }
 thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["full"] }
-tower-http = { version = "0.7.1", features = ["fs"] }
+tower-http = { version = "0.7.1", features = ["compression-br", "compression-gzip", "fs"] }
 tracing = "0.1.44"
 tracing-opentelemetry = "0.34.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
