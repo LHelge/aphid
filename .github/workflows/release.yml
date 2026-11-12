@@ -19,15 +19,18 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         if: startsWith(github.ref, 'refs/tags/v')
 
-      - name: Verify tag matches Cargo.toml version
+      - name: Verify tag matches Cargo.toml versions
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           tag="${GITHUB_REF_NAME#v}"
-          manifest=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
-          if [ "$tag" != "$manifest" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME (=$tag) does not match Cargo.toml version $manifest"
-            exit 1
-          fi
+          # aphid and aphid-server are versioned in lockstep.
+          for manifest in Cargo.toml aphid-server/Cargo.toml; do
+            version=$(grep -m1 '^version' "$manifest" | cut -d'"' -f2)
+            if [ "$tag" != "$version" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME (=$tag) does not match $manifest version $version"
+              exit 1
+            fi
+          done
 
   ci:
     name: CI
@@ -110,6 +113,114 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.ref_name }}" aphid-${{ github.ref_name }}-${{ matrix.target }}.*
+
+  server-binaries:
+    name: Build aphid-server (${{ matrix.target }})
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            arch: amd64
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-24.04-arm
+            arch: arm64
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          key: ${{ matrix.target }}
+
+      # Native build on each architecture's runner; musl-gcc compiles the C
+      # parts (aws-lc via rustls). The target is added to the toolchain pinned
+      # by rust-toolchain.toml, not to the action's `stable`.
+      - name: Install musl tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          rustup target add ${{ matrix.target }}
+
+      - name: Build
+        env:
+          CARGO_PROFILE_RELEASE_STRIP: symbols
+        run: cargo build --release --locked -p aphid-server --target ${{ matrix.target }}
+
+      - name: Check the binary is static
+        run: |
+          bin=target/${{ matrix.target }}/release/aphid-server
+          file "$bin"
+          file "$bin" | grep -q 'statically linked'
+
+      - name: Package
+        run: tar czf aphid-server-${{ github.ref_name }}-${{ matrix.target }}.tar.gz -C target/${{ matrix.target }}/release aphid-server
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.ref_name }}" aphid-server-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: aphid-server-${{ matrix.arch }}
+          path: target/${{ matrix.target }}/release/aphid-server
+          if-no-files-found: error
+
+  server-image:
+    name: Publish aphid-server image
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: server-binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: aphid-server-*
+          path: aphid-server/dist
+
+      # aphid-server/dist/aphid-server-<arch>/aphid-server -> dist/<arch>/aphid-server,
+      # the layout the Dockerfile expects (TARGETARCH).
+      - name: Arrange binaries per architecture
+        working-directory: aphid-server/dist
+        run: |
+          for arch in amd64 arm64; do mv "aphid-server-$arch" "$arch"; done
+          ls -lR
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/lhelge/aphid-server
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: aphid-server
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
   publish:
     name: Publish to crates.io
