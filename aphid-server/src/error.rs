@@ -12,6 +12,8 @@ pub enum Error {
     LogLevel(#[from] tracing_subscriber::filter::ParseError),
     #[error("OpenTelemetry exporter: {0}")]
     Otlp(#[from] opentelemetry_otlp::ExporterBuildError),
+    #[error("OTLP HTTP client: {0}")]
+    HttpClient(#[from] reqwest::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

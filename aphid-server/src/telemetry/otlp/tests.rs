@@ -148,3 +148,9 @@ fn failures_are_reported_once_per_outage() {
         "next outage reported again"
     );
 }
+
+#[test]
+fn http_client_builds_with_embedded_roots() {
+    assert!(!webpki_root_certs::TLS_SERVER_ROOT_CERTS.is_empty());
+    OtlpPipeline::http_client().expect("client with webpki roots");
+}

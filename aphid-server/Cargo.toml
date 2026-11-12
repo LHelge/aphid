@@ -15,14 +15,16 @@ clap = { version = "4.6.7", features = ["derive", "env"] }
 opentelemetry = "0.33.1"
 opentelemetry-appender-tracing = "0.33.1"
 opentelemetry-http = "0.33.1"
-opentelemetry-otlp = { version = "0.33.1", default-features = false, features = ["http-proto", "reqwest-blocking-client", "reqwest-rustls", "trace", "logs", "internal-logs"] }
+opentelemetry-otlp = { version = "0.33.1", default-features = false, features = ["http-proto", "reqwest-blocking-client", "trace", "logs", "internal-logs"] }
 opentelemetry_sdk = "0.33.1"
+reqwest = { version = "0.13.5", default-features = false, features = ["blocking", "rustls"] }
 thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["full"] }
 tower-http = { version = "0.7.1", features = ["fs"] }
 tracing = "0.1.44"
 tracing-opentelemetry = "0.34.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
+webpki-root-certs = "1.0.12"
 
 [dev-dependencies]
 opentelemetry-semantic-conventions = { version = "0.33.1", features = ["semconv_experimental"] }

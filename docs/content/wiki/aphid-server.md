@@ -19,7 +19,7 @@ FROM ghcr.io/lhelge/aphid-server:0.4.0
 COPY dist /site
 ```
 
-The image is based on `scratch`, runs as the non-root user `65532`, listens on port 8080 and serves `/site`. Image tags follow aphid's releases (`0.4.0`, `0.4`, `latest`); pin an exact version.
+The image is `scratch` plus the binary (no shell, no CA bundle). It runs as the non-root user `65532`, listens on port 8080 and serves `/site`. Image tags follow aphid's releases (`0.4.0`, `0.4`, `latest`); pin an exact version.
 
 # What it serves
 
@@ -63,7 +63,8 @@ Setting `--otlp-endpoint` (or `OTEL_EXPORTER_OTLP_ENDPOINT`) exports traces and 
 
 - **Traces:** one server span per request (none for `/healthz`), named after the method and carrying the HTTP semantic-convention attributes (`http.request.method`, `url.path`, `http.response.status_code`, `client.address`, `user_agent.original`, …). An incoming W3C `traceparent` header is continued. Spans are exported whatever `--log-level` is.
 - **Logs:** log events that pass `--log-level` are exported as OTel log records, linked to the request's span.
-- **Configuration:** the endpoint is a base URL (`/v1/traces` and `/v1/logs` are appended). The standard variables `OTEL_SERVICE_NAME` (default `aphid-server`), `OTEL_RESOURCE_ATTRIBUTES`, `OTEL_EXPORTER_OTLP_HEADERS` and the per-signal `OTEL_EXPORTER_OTLP_{TRACES,LOGS}_ENDPOINT` are honoured. HTTPS endpoints work: the image includes CA certificates.
+- **Configuration:** the endpoint is a base URL (`/v1/traces` and `/v1/logs` are appended). The standard variables `OTEL_SERVICE_NAME` (default `aphid-server`), `OTEL_RESOURCE_ATTRIBUTES`, `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_EXPORTER_OTLP_TIMEOUT` and the per-signal `OTEL_EXPORTER_OTLP_{TRACES,LOGS}_ENDPOINT` are honoured.
+- **HTTPS endpoints:** certificates are checked against Mozilla's root store, which is compiled into the binary, so the image needs no CA bundle. A collector with a private or self-signed CA is not supported. The server itself only speaks plain HTTP; inbound TLS is the reverse proxy's job.
 - **Failure handling:** export runs in the background and drops data when the collector can't keep up. It never delays or fails a request. When export starts failing, one warning is logged, and one more line when it recovers. On shutdown, buffered telemetry is flushed for at most 3 seconds.
 
 # hoster
