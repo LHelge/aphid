@@ -44,3 +44,6 @@ reqwest = "0.13.2"
 tempfile = "3.27.0"
 tokio-tungstenite = "0.29.0"
 walkdir = "2.5.0"
+
+[workspace]
+members = ["aphid-server"]

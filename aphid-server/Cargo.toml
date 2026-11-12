@@ -1,0 +1,24 @@
+[package]
+name = "aphid-server"
+version = "0.3.0"
+edition = "2024"
+rust-version = "1.94"
+description = "A small production static-file server for sites built with aphid."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/LHelge/aphid"
+homepage = "https://aphid.lhelge.se"
+publish = false
+
+[dependencies]
+axum = "0.8.9"
+clap = { version = "4.6.7", features = ["derive", "env"] }
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["full"] }
+tower-http = { version = "0.7.1", features = ["fs"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
+
+[dev-dependencies]
+reqwest = "0.13.5"
+serde_json = "1.0.154"
+tempfile = "3.27.0"
