@@ -45,7 +45,7 @@ jobs:
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
       - name: Build docs with aphid
-        run: cargo run --release -- --config docs/aphid.toml build --output docs/dist
+        run: cargo run --release -- --config docs/aphid.toml build --output docs/dist --precompress
 
       # The docs run on the aphid-server release they document. On a manual run
       # from main this is the version in Cargo.toml, which must be released.
