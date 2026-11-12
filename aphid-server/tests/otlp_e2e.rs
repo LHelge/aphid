@@ -114,8 +114,10 @@ impl Server {
             let lines = Arc::clone(&lines);
             std::thread::spawn(move || {
                 for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-                    let _ = tx.send(line.clone());
-                    lines.lock().unwrap().push(line);
+                    // Record before signalling, so a line that unblocks
+                    // the caller is already visible in `lines`.
+                    lines.lock().unwrap().push(line.clone());
+                    let _ = tx.send(line);
                 }
             });
         }
