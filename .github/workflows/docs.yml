@@ -1,27 +1,42 @@
 name: Docs
 
+# Builds https://aphid.lhelge.se with aphid, packs it into an aphid-server image
+# (docs/Dockerfile), pushes ghcr.io/lhelge/aphid-docs and deploys its digest to
+# hoster through the OIDC-authenticated deploy webhook. The stack file is
+# docs/hoster/aphid-docs.stack.toml.
+#
+# Runs from release.yml on every release tag (after the aphid-server image of
+# that release is published), or by hand from main.
+
 on:
   workflow_call:
   workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
+  IMAGE: ghcr.io/lhelge/aphid-docs
+  STACK: aphid-docs
+  SERVICE: web
+  HOSTER_URL: https://hoster.lhelge.se/hooks/deploy
+  HOSTER_AUDIENCE: https://hoster.lhelge.se
 
 concurrency:
-  group: pages
+  group: docs-deploy
   cancel-in-progress: false
 
 jobs:
   deploy:
     name: Deploy docs
     runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-      contents: read
+    # Limited to v* tags and main in the repository settings; the stack's
+    # [deploy] rule requires this environment claim.
     environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      name: production
+      url: https://aphid.lhelge.se
+    permissions:
+      contents: read
+      packages: write   # push to ghcr with GITHUB_TOKEN
+      id-token: write   # request an OIDC token for hoster
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -29,14 +44,68 @@ jobs:
 
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
-      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-
       - name: Build docs with aphid
-        run: cargo run --release -- --config docs/aphid.toml build --output _site
+        run: cargo run --release -- --config docs/aphid.toml build --output docs/dist
 
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+      # The docs run on the aphid-server release they document. On a manual run
+      # from main this is the version in Cargo.toml, which must be released.
+      - name: Determine aphid-server version
+        id: version
+        run: echo "aphid_server=$(grep -m1 '^version' aphid-server/Cargo.toml | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
-          path: _site
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - id: deployment
-        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=ref,event=branch
+            type=sha
+
+      # docs/Dockerfile only copies files onto a multi-arch base image, so both
+      # platforms build without emulation and the image fits any VPS.
+      - id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: docs
+          push: true
+          platforms: linux/amd64,linux/arm64
+          build-args: APHID_SERVER_VERSION=${{ steps.version.outputs.aphid_server }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      # See https://docs.hoster.lhelge.se/wiki/deploying-from-ci/. The token is
+      # single-use: never retry the POST with the same one.
+      - name: Deploy to hoster
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -euo pipefail
+          audience=$(jq -rn --arg a "$HOSTER_AUDIENCE" '$a|@uri')
+          token=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$audience" | jq -r .value)
+          echo "::add-mask::$token"
+
+          body=$(jq -nc --arg s "$STACK" --arg svc "$SERVICE" --arg d "$DIGEST" \
+            --arg t "$GITHUB_REF_NAME@${GITHUB_SHA::7}" '{stack:$s, images:{($svc):$d}, tag:$t}')
+          echo "request: $body"
+          status=$(curl -sS -o response.json -w '%{http_code}' -X POST "$HOSTER_URL" \
+            -H 'Content-Type: application/json' \
+            -H "Authorization: Bearer $token" \
+            --data "$body")
+          echo "response ($status): $(cat response.json)"
+          case "$status" in
+            200|202) ;;
+            *) echo "::error::hoster refused the deploy ($status): $(cat response.json)"; exit 1 ;;
+          esac
+
+          id=$(jq -r .deployment_id response.json)
+          echo "Deployment: ${HOSTER_URL%/hooks/deploy}/stacks/$STACK/deployments/$id" >> "$GITHUB_STEP_SUMMARY"

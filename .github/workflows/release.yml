@@ -239,11 +239,15 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish
 
+  # The docs image is built on this release's aphid-server image, so on a tag
+  # it waits for server-image. On a manual run (no tag) server-image is
+  # skipped and the docs build on the version already released.
   docs:
     name: Deploy docs
-    needs: ci
+    needs: [ci, server-image]
+    if: ${{ !cancelled() && needs.ci.result == 'success' && contains(fromJSON('["success", "skipped"]'), needs.server-image.result) }}
     uses: ./.github/workflows/docs.yml
     permissions:
-      pages: write
-      id-token: write
       contents: read
+      packages: write
+      id-token: write

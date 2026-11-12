@@ -1,0 +1,28 @@
+# hoster stack for the aphid documentation site (https://aphid.lhelge.se).
+#
+# Applied by hand in hoster's UI (Stacks → New stack / Apply); CI only sends
+# image digests. .github/workflows/docs.yml builds ghcr.io/lhelge/aphid-docs
+# and posts its digest to hoster's deploy webhook. `hoster stack check` runs on
+# this file in CI (.github/workflows/ci.yml).
+version = 1
+name = "aphid-docs"
+
+[services.web]
+image = "ghcr.io/lhelge/aphid-docs"   # pushed by docs.yml, deployed by digest
+
+# aphid-server listens on $PORT, which hoster sets to the route's port, and
+# answers hoster's default health probe (GET /healthz).
+[services.web.env]
+APHID_LOG_FORMAT = "json"
+
+[[services.web.routes]]
+host = "aphid.lhelge.se"
+port = 8080
+
+# Only this repository may deploy, from release tags (the docs job of
+# release.yml) or from main (a manual run of docs.yml), and only from jobs in
+# the protected "production" GitHub environment.
+[deploy]
+repository_id = 1222958523            # gh api repos/LHelge/aphid --jq .id
+refs = ["refs/tags/v*", "refs/heads/main"]
+environment = "production"
