@@ -64,6 +64,7 @@ The action accepts these inputs:
 | `version` | `latest` | aphid version to download (e.g. `v0.1.4`) |
 | `config` | `aphid.toml` | Path to the config file |
 | `output` | `dist` | Output directory for the built site |
+| `precompress` | `false` | Also write `.br` and `.gz` variants of text files, for [[aphid-server]] |
 
 If your `aphid.toml` is not at the repository root, pass the path explicitly:
 
@@ -151,4 +152,4 @@ The output is plain HTML — any host that can serve static files works.
 | Codeberg Pages | Push the built `dist/` contents to a `pages` branch |
 | Netlify / Vercel | Set the build command to `cargo install aphid && aphid build` and the publish directory to `dist` |
 | Self-hosted | Copy `dist/` to any web server; no server-side logic required |
-| Container | `FROM ghcr.io/lhelge/aphid-server` + `COPY dist /site`; see [[aphid-server]] |
+| Container | Build with `aphid build --precompress`, then `FROM ghcr.io/lhelge/aphid-server` + `COPY dist /site`; see [[aphid-server]] |

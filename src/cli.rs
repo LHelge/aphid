@@ -18,6 +18,10 @@ pub enum Command {
         /// Output directory for the rendered site.
         #[arg(short, long, default_value = "dist")]
         output: PathBuf,
+        /// Also write brotli (.br) and gzip (.gz) variants of text files,
+        /// which aphid-server sends instead of compressing on every request.
+        #[arg(long)]
+        precompress: bool,
     },
     Serve {
         #[arg(short, long, default_value_t = 3000)]

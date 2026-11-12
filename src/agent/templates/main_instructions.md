@@ -22,7 +22,7 @@ it with project-specific guidance; delete it first if you want a clean regenerat
 # Common commands
 
 - `aphid serve` — start the dev server on port 3000 with file watching and live reload. `--port` overrides the port.
-- `aphid build` — render the site into `dist/`. `--output <dir>` overrides the directory.
+- `aphid build` — render the site into `dist/`. `--output <dir>` overrides the directory; `--precompress` also writes `.br`/`.gz` variants of text files for `aphid-server`.
 - `aphid new <name>` — scaffold a complete site in a new directory.
 - `aphid init [path]` — scaffold a site in the current (or given) directory.
 - `aphid blog new "Title"` — scaffold a new blog post (filename gets today's date prefix).

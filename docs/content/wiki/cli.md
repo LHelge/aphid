@@ -55,6 +55,9 @@ Render every page into the output directory (default `./dist/`) and copy theme +
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--output`, `-o` | `dist` | Directory to write the rendered site into |
+| `--precompress` | off | Also write brotli (`.br`) and gzip (`.gz`) variants next to text files |
+
+`--precompress` is for a site served by [[aphid-server]], which sends the variants instead of compressing on every request. HTML, CSS, JavaScript, JSON, XML, SVG and plain-text files of at least 1 KiB get a `.br` and a `.gz` sibling (`index.html` → `index.html.br`, `index.html.gz`); the originals stay. It makes the build slower and the output larger, and hosts that don't know the convention, GitHub Pages among them, just ignore the extra files, so leave it off there.
 
 This is the command for CI and one-shot deployments — see [[deployment]].
 
@@ -147,6 +150,7 @@ aphid                                    # serve on :3000
 aphid serve --port 8080                  # serve on :8080
 aphid build                              # one-shot render into dist/
 aphid build --output public              # render into public/
+aphid build --precompress                # also write .br/.gz variants for aphid-server
 aphid --config docs/aphid.toml build     # render the docs site
 aphid -c sub/aphid.toml                  # serve with a non-default config
 ```

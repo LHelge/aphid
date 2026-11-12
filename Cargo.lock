@@ -120,8 +120,10 @@ name = "aphid"
 version = "0.4.1"
 dependencies = [
  "axum",
+ "brotli",
  "chrono",
  "clap",
+ "flate2",
  "futures-util",
  "image",
  "insta",

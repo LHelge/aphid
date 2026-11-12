@@ -44,11 +44,15 @@ impl Server {
 
     /// The axum application: `/healthz`, then files from the root.
     ///
-    /// Compression is the outermost layer, so the access log sees the
+    /// A `.br` or `.gz` sibling of a file (as written by
+    /// `aphid build --precompress`) is sent as it is; everything else is
+    /// compressed on the fly. Compression is the outermost layer, so the access log sees the
     /// response before it is encoded and still has its `Content-Length`.
     pub fn router(root: &std::path::Path) -> Router {
         let not_found = NotFoundPage::handler.with_state(NotFoundPage::new(root));
         let files = ServeDir::new(root)
+            .precompressed_br()
+            .precompressed_gzip()
             .ignore_multi_range_requests(true)
             .fallback(not_found);
 

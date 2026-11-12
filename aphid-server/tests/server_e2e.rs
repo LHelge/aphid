@@ -344,6 +344,80 @@ async fn does_not_compress_images_or_ranges() {
 }
 
 #[tokio::test]
+async fn serves_precompressed_variants_when_present() {
+    let (_tmp, root) = site();
+    let page = "<p>precompressed</p>".repeat(200);
+    std::fs::create_dir_all(root.join("docs")).unwrap();
+    std::fs::write(root.join("docs/index.html"), &page).unwrap();
+    // Not real brotli/gzip: the server must send the files untouched.
+    std::fs::write(root.join("docs/index.html.br"), "BR VARIANT").unwrap();
+    std::fs::write(root.join("docs/index.html.gz"), "GZ VARIANT").unwrap();
+    let server = TestServer::start(&root);
+
+    for (accept, encoding, body) in [
+        ("br", "br", "BR VARIANT"),
+        ("gzip", "gzip", "GZ VARIANT"),
+        ("gzip, br", "br", "BR VARIANT"),
+    ] {
+        let res = client()
+            .get(server.url("/docs/"))
+            .header(header::ACCEPT_ENCODING, accept)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK, "{accept}");
+        assert_eq!(
+            res.headers()[header::CONTENT_ENCODING],
+            encoding,
+            "{accept}"
+        );
+        assert_eq!(res.headers()[header::CONTENT_LENGTH], "10", "{accept}");
+        assert!(
+            res.headers()[header::CONTENT_TYPE]
+                .to_str()
+                .unwrap()
+                .starts_with("text/html")
+        );
+        assert!(
+            res.headers()[header::VARY]
+                .to_str()
+                .unwrap()
+                .eq_ignore_ascii_case("accept-encoding")
+        );
+        assert_eq!(res.text().await.unwrap(), body, "{accept}");
+    }
+
+    // The access log reports the size of the file sent.
+    assert_eq!(server.wait_for_access("/docs/")["bytes"], 10);
+
+    // A client that accepts no encoding gets the original file.
+    let res = client().get(server.url("/docs/")).send().await.unwrap();
+    assert!(!res.headers().contains_key(header::CONTENT_ENCODING));
+    assert_eq!(res.text().await.unwrap(), page);
+}
+
+#[tokio::test]
+async fn compresses_on_the_fly_when_a_variant_is_missing() {
+    let (_tmp, root) = site();
+    let page = "<p>only gzip on disk</p>".repeat(200);
+    std::fs::write(root.join("big.html"), &page).unwrap();
+    std::fs::write(root.join("big.html.gz"), "GZ VARIANT").unwrap();
+    let server = TestServer::start(&root);
+
+    let res = client()
+        .get(server.url("/big.html"))
+        .header(header::ACCEPT_ENCODING, "br")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.headers()[header::CONTENT_ENCODING], "br");
+    assert!(!res.headers().contains_key(header::CONTENT_LENGTH));
+    let body = res.bytes().await.unwrap();
+    assert!(body.len() < page.len() / 2);
+    assert_ne!(&body[..], b"GZ VARIANT");
+}
+
+#[tokio::test]
 async fn redirects_directories_with_relative_location() {
     let (_tmp, root) = site();
     let server = TestServer::start(&root);
