@@ -79,29 +79,33 @@ impl Server {
         Ok(())
     }
 
-    /// Resolves on SIGTERM or SIGINT.
-    pub async fn shutdown_signal() {
-        let interrupt = async {
-            let _ = tokio::signal::ctrl_c().await;
-        };
+    /// A future that resolves on SIGTERM or SIGINT.
+    ///
+    /// The signal handlers are installed by this call, not when the future is
+    /// first polled, so a signal that arrives before the server starts
+    /// accepting still shuts it down cleanly instead of killing the process.
+    /// Must be called inside a tokio runtime.
+    pub fn shutdown_signal() -> Result<impl Future<Output = ()> + Send + 'static> {
         #[cfg(unix)]
-        let terminate = async {
+        let (mut interrupt, mut terminate) = {
             use tokio::signal::unix::{SignalKind, signal};
-            match signal(SignalKind::terminate()) {
-                Ok(mut sig) => {
-                    sig.recv().await;
-                }
-                Err(_) => std::future::pending().await,
-            }
+            (
+                signal(SignalKind::interrupt())?,
+                signal(SignalKind::terminate())?,
+            )
         };
-        #[cfg(not(unix))]
-        let terminate = std::future::pending::<()>();
 
-        tokio::select! {
-            () = interrupt => {},
-            () = terminate => {},
-        }
-        tracing::info!("shutdown signal received, draining connections");
+        Ok(async move {
+            #[cfg(unix)]
+            tokio::select! {
+                _ = interrupt.recv() => {},
+                _ = terminate.recv() => {},
+            }
+            #[cfg(not(unix))]
+            let _ = tokio::signal::ctrl_c().await;
+
+            tracing::info!("shutdown signal received, draining connections");
+        })
     }
 
     /// `//host/x` → `/host/x`, so a trailing-slash redirect can never produce a
