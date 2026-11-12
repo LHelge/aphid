@@ -154,11 +154,13 @@ jobs:
           CARGO_PROFILE_RELEASE_STRIP: symbols
         run: cargo build --release --locked -p aphid-server --target ${{ matrix.target }}
 
+      # `file` says "statically linked" or, for static PIE (the x86_64 musl
+      # default), "static-pie linked"; both have no dynamic dependencies.
       - name: Check the binary is static
         run: |
           bin=target/${{ matrix.target }}/release/aphid-server
           file "$bin"
-          file "$bin" | grep -q 'statically linked'
+          file "$bin" | grep -Eq 'statically linked|static-pie linked'
 
       - name: Package
         run: tar czf aphid-server-${{ github.ref_name }}-${{ matrix.target }}.tar.gz -C target/${{ matrix.target }}/release aphid-server
