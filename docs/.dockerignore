@@ -1,0 +1,3 @@
+# Only the rendered site goes into the image.
+*
+!dist

@@ -89,3 +89,5 @@ port = 8080
 ```
 
 Put auth headers for a hosted collector in `[services.web.secrets]` as `OTEL_EXPORTER_OTLP_HEADERS`.
+
+This documentation site is deployed exactly this way. For a complete working setup, see [`docs/Dockerfile`](https://github.com/LHelge/aphid/blob/main/docs/Dockerfile), the stack file [`docs/hoster/aphid-docs.stack.toml`](https://github.com/LHelge/aphid/blob/main/docs/hoster/aphid-docs.stack.toml) and the workflow [`.github/workflows/docs.yml`](https://github.com/LHelge/aphid/blob/main/.github/workflows/docs.yml), which builds the image and deploys its digest through hoster's deploy webhook.
