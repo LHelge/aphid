@@ -263,6 +263,87 @@ async fn serves_range_requests() {
 }
 
 #[tokio::test]
+async fn compresses_text_when_the_client_accepts_it() {
+    let (_tmp, root) = site();
+    let page = "<p>compress me</p>".repeat(200);
+    std::fs::write(root.join("big.html"), &page).unwrap();
+    let server = TestServer::start(&root);
+
+    for (accept, encoding) in [("gzip", "gzip"), ("br", "br"), ("gzip, br", "br")] {
+        let res = client()
+            .get(server.url("/big.html"))
+            .header(header::ACCEPT_ENCODING, accept)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            res.headers()[header::CONTENT_ENCODING],
+            encoding,
+            "{accept}"
+        );
+        assert_eq!(res.headers()[header::VARY], "accept-encoding");
+        let body = res.bytes().await.unwrap();
+        assert!(
+            body.len() < page.len() / 2,
+            "{accept}: {} bytes",
+            body.len()
+        );
+        if encoding == "gzip" {
+            assert_eq!(body[..2], [0x1f, 0x8b]);
+        }
+    }
+
+    // The access log reports the size before compression.
+    assert_eq!(server.wait_for_access("/big.html")["bytes"], page.len());
+}
+
+#[tokio::test]
+async fn leaves_responses_alone_without_accept_encoding() {
+    let (_tmp, root) = site();
+    let page = "<p>compress me</p>".repeat(200);
+    std::fs::write(root.join("big.html"), &page).unwrap();
+    let server = TestServer::start(&root);
+
+    let res = client().get(server.url("/big.html")).send().await.unwrap();
+    assert!(!res.headers().contains_key(header::CONTENT_ENCODING));
+    assert_eq!(
+        res.headers()[header::CONTENT_LENGTH],
+        page.len().to_string()
+    );
+    assert_eq!(res.text().await.unwrap(), page);
+}
+
+#[tokio::test]
+async fn does_not_compress_images_or_ranges() {
+    let (_tmp, root) = site();
+    let blob = "0123456789".repeat(500);
+    std::fs::write(root.join("photo.png"), &blob).unwrap();
+    std::fs::write(root.join("big.txt"), &blob).unwrap();
+    let server = TestServer::start(&root);
+
+    let res = client()
+        .get(server.url("/photo.png"))
+        .header(header::ACCEPT_ENCODING, "gzip, br")
+        .send()
+        .await
+        .unwrap();
+    assert!(!res.headers().contains_key(header::CONTENT_ENCODING));
+    assert_eq!(res.bytes().await.unwrap().len(), blob.len());
+
+    let res = client()
+        .get(server.url("/big.txt"))
+        .header(header::ACCEPT_ENCODING, "gzip, br")
+        .header(header::RANGE, "bytes=2-5")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::PARTIAL_CONTENT);
+    assert!(!res.headers().contains_key(header::CONTENT_ENCODING));
+    assert_eq!(res.text().await.unwrap(), "2345");
+}
+
+#[tokio::test]
 async fn redirects_directories_with_relative_location() {
     let (_tmp, root) = site();
     let server = TestServer::start(&root);

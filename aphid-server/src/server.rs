@@ -13,7 +13,7 @@ use axum::{
     routing::get,
 };
 use tokio::net::TcpListener;
-use tower_http::services::ServeDir;
+use tower_http::{compression::CompressionLayer, services::ServeDir};
 
 use crate::{Config, Error, Result, access_log::AccessLog, not_found::NotFoundPage};
 
@@ -43,6 +43,9 @@ impl Server {
     }
 
     /// The axum application: `/healthz`, then files from the root.
+    ///
+    /// Compression is the outermost layer, so the access log sees the
+    /// response before it is encoded and still has its `Content-Length`.
     pub fn router(root: &std::path::Path) -> Router {
         let not_found = NotFoundPage::handler.with_state(NotFoundPage::new(root));
         let files = ServeDir::new(root)
@@ -54,6 +57,7 @@ impl Server {
             .fallback_service(files)
             .layer(middleware::map_request(Self::collapse_leading_slashes))
             .layer(middleware::from_fn(AccessLog::middleware))
+            .layer(CompressionLayer::new())
     }
 
     /// Serve until `shutdown` resolves, then stop accepting and drain
