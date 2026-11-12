@@ -11,6 +11,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Both modes share the same rendering pipeline; they differ only in what they do with the output and in broken-wiki-link handling (see below).
 
+The repo is a Cargo workspace. `aphid` is the root package; `aphid-server/` is a second member: a small production static-file server for a built `dist/`, shipped as a container image. It must not depend on the `aphid` crate or its heavy dependencies (image, resvg, syntect, tera, rayon, notify). Its version is kept in lockstep with `aphid`'s, and it is not published to crates.io.
+
 ## Architecture
 
 A **two-pass pipeline** is the load-bearing idea. Rendering a single file cannot be done in isolation because `[[wiki-links]]` may point at any other file in the site.
@@ -56,10 +58,12 @@ Site configuration lives in `aphid.toml` at the project root (title, `base_url`,
 Run each before committing (non-negotiable — see the style rules below):
 
 ```sh
-cargo fmt
-cargo clippy --all-targets -- -D warnings
-cargo test
+cargo fmt --all
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 ```
+
+`--workspace` matters: from the repo root, plain `cargo clippy`/`cargo test` only cover the root `aphid` package.
 
 Running the binary locally:
 
