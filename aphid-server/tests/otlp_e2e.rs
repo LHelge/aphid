@@ -96,13 +96,54 @@ struct Server {
 }
 
 impl Server {
+    /// Start with JSON logs on an ephemeral port read from the "listening" line.
     fn start(root: &Path, env: &[(&str, &str)]) -> Self {
+        let (mut server, rx) = Self::spawn(root, env, 0, "json");
+        let port = loop {
+            let line = rx.recv_timeout(Duration::from_secs(10)).unwrap();
+            if line.contains("listening") {
+                let rest = &line[line.find("0.0.0.0:").unwrap() + 8..];
+                break rest
+                    .chars()
+                    .take_while(char::is_ascii_digit)
+                    .collect::<String>()
+                    .parse()
+                    .unwrap();
+            }
+        };
+        server.addr.set_port(port);
+        server
+    }
+
+    /// Start with `--log-format none`. Nothing is printed, so reserve a port
+    /// up front and wait until the server accepts connections on it.
+    fn start_silent(root: &Path, env: &[(&str, &str)]) -> Self {
+        let port = TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        let (server, _rx) = Self::spawn(root, env, port, "none");
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while TcpStream::connect(server.addr).is_err() {
+            assert!(Instant::now() < deadline, "server never accepted");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        server
+    }
+
+    fn spawn(
+        root: &Path,
+        env: &[(&str, &str)],
+        port: u16,
+        log_format: &str,
+    ) -> (Self, mpsc::Receiver<String>) {
         let mut child = Command::new(env!("CARGO_BIN_EXE_aphid-server"))
             .env_clear()
             .envs(env.iter().copied())
             .arg("--root")
             .arg(root)
-            .args(["--port", "0", "--log-format", "json"])
+            .args(["--port", &port.to_string(), "--log-format", log_format])
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
             .spawn()
@@ -121,23 +162,12 @@ impl Server {
                 }
             });
         }
-        let port = loop {
-            let line = rx.recv_timeout(Duration::from_secs(10)).unwrap();
-            if line.contains("listening") {
-                let rest = &line[line.find("0.0.0.0:").unwrap() + 8..];
-                break rest
-                    .chars()
-                    .take_while(char::is_ascii_digit)
-                    .collect::<String>()
-                    .parse()
-                    .unwrap();
-            }
-        };
-        Self {
+        let server = Self {
             child,
             addr: SocketAddr::from(([127, 0, 0, 1], port)),
             lines,
-        }
+        };
+        (server, rx)
     }
 
     /// GET `path`, returning the status and how long the response took.
@@ -231,6 +261,23 @@ fn no_endpoint_means_no_exporter() {
         !server.lines().iter().any(|l| l.contains("OpenTelemetry")),
         "{:?}",
         server.lines()
+    );
+}
+
+#[test]
+fn log_format_none_exports_but_prints_nothing() {
+    let collector = FakeCollector::start();
+    let site = site();
+    let url = collector.url();
+    let mut server = Server::start_silent(site.path(), &[("OTEL_EXPORTER_OTLP_ENDPOINT", &url)]);
+    assert_eq!(server.get("/").0, 200);
+    assert!(server.terminate().0);
+
+    assert!(server.lines().is_empty(), "{:#?}", server.lines());
+    let received = collector.received();
+    assert!(
+        received.iter().any(|r| r.path == "/v1/logs"),
+        "no logs exported: {received:?}"
     );
 }
 

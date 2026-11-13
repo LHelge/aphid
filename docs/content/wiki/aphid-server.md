@@ -52,13 +52,13 @@ Every option is a flag or an environment variable; a flag wins over the environm
 |------|-------------|---------|-------------|
 | `--root` | `APHID_ROOT` | `/site` | Directory to serve |
 | `--port` | `PORT` | `8080` | Listen port, on all interfaces |
-| `--log-format` | `APHID_LOG_FORMAT` | `text` | `text` for humans, `json` for one JSON object per line |
+| `--log-format` | `APHID_LOG_FORMAT` | `text` | `text` for humans, `json` for one JSON object per line, `none` for no stdout logging |
 | `--log-level` | `APHID_LOG_LEVEL` | `info` | Log filter, e.g. `warn` or `info,aphid_server=debug` |
 | `--otlp-endpoint` | `OTEL_EXPORTER_OTLP_ENDPOINT` | unset | OTLP/HTTP base URL; enables OpenTelemetry export |
 
 # Logs
 
-Logs go to stdout. Every request except `/healthz` produces one `info` event with target `aphid_server::access` and the fields `method`, `path`, `status`, `duration_ms` (time to response headers), `bytes` (the size of the file sent: the compressed size for a precompressed file, the size before compression otherwise), `referrer`, `user_agent` and `client` (the left-most `X-Forwarded-For` entry, else the peer address). With `--log-format json`:
+Logs go to stdout, unless `--log-format none` turns them off. Every request except `/healthz` produces one `info` event with target `aphid_server::access` and the fields `method`, `path`, `status`, `duration_ms` (time to response headers), `bytes` (the size of the file sent: the compressed size for a precompressed file, the size before compression otherwise), `referrer`, `user_agent` and `client` (the left-most `X-Forwarded-For` entry, else the peer address). With `--log-format json`:
 
 ```json
 {"timestamp":"2026-11-12T10:24:14.440176Z","level":"INFO","message":"request","method":"GET","path":"/broken-link/","status":404,"duration_ms":0.44,"bytes":14,"referrer":"https://example.com/posts/","user_agent":"Mozilla/5.0 …","client":"203.0.113.7","target":"aphid_server::access"}
@@ -72,13 +72,13 @@ jq -c 'select(.status == 404) | {path, referrer}' server.log
 
 # OpenTelemetry
 
-Setting `--otlp-endpoint` (or `OTEL_EXPORTER_OTLP_ENDPOINT`) exports traces and logs over OTLP/HTTP with protobuf. Without it, no exporter is started. Stdout logging is unchanged either way.
+Setting `--otlp-endpoint` (or `OTEL_EXPORTER_OTLP_ENDPOINT`) exports traces and logs over OTLP/HTTP with protobuf. Without it, no exporter is started. Stdout logging is unchanged either way. To send logs to the collector only, add `--log-format none`.
 
 - **Traces:** one server span per request (none for `/healthz`), named after the method and carrying the HTTP semantic-convention attributes (`http.request.method`, `url.path`, `http.response.status_code`, `client.address`, `user_agent.original`, …). `http.response.body.size` is the same number as `bytes` in the access log. An incoming W3C `traceparent` header is continued. Spans are exported whatever `--log-level` is.
 - **Logs:** log events that pass `--log-level` are exported as OTel log records, linked to the request's span.
 - **Configuration:** the endpoint is a base URL (`/v1/traces` and `/v1/logs` are appended). The standard variables `OTEL_SERVICE_NAME` (default `aphid-server`), `OTEL_RESOURCE_ATTRIBUTES`, `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_EXPORTER_OTLP_TIMEOUT` and the per-signal `OTEL_EXPORTER_OTLP_{TRACES,LOGS}_ENDPOINT` are honoured.
 - **HTTPS endpoints:** certificates are checked against Mozilla's root store, which is compiled into the binary, so the image needs no CA bundle. A collector with a private or self-signed CA is not supported. The server itself only speaks plain HTTP; inbound TLS is the reverse proxy's job.
-- **Failure handling:** export runs in the background and drops data when the collector can't keep up. It never delays or fails a request. When export starts failing, one warning is logged, and one more line when it recovers. On shutdown, buffered telemetry is flushed for at most 3 seconds.
+- **Failure handling:** export runs in the background and drops data when the collector can't keep up. It never delays or fails a request. When export starts failing, one warning is logged, and one more line when it recovers. On shutdown, buffered telemetry is flushed for at most 3 seconds. With `--log-format none`, these warnings go only to the collector, so a collector that is down is not reported anywhere. A fatal startup error, such as a missing root directory, is still printed to stderr.
 
 # hoster
 

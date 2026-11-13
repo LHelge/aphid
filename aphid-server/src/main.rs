@@ -1,6 +1,6 @@
 use std::process::ExitCode;
 
-use aphid_server::{Config, Server, Telemetry};
+use aphid_server::{Config, LogFormat, Server, Telemetry};
 use clap::Parser;
 
 fn main() -> ExitCode {
@@ -31,6 +31,10 @@ fn main() -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
             tracing::error!(error = %err, "fatal");
+            // With stdout logging off, a fatal error must still be visible.
+            if config.log_format == LogFormat::None {
+                eprintln!("aphid-server: {err}");
+            }
             ExitCode::FAILURE
         }
     };

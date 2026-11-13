@@ -17,7 +17,8 @@ pub struct Config {
     #[arg(long, env = "PORT", default_value_t = 8080)]
     pub port: u16,
 
-    /// Log output format on stdout.
+    /// Log output format on stdout. `none` turns stdout logging off, e.g.
+    /// when logs only go to OpenTelemetry.
     #[arg(long, env = "APHID_LOG_FORMAT", value_enum, default_value_t = LogFormat::Text)]
     pub log_format: LogFormat,
 
@@ -46,4 +47,6 @@ pub enum LogFormat {
     Text,
     /// One JSON object per line.
     Json,
+    /// Nothing on stdout.
+    None,
 }
