@@ -1,7 +1,8 @@
 //! Process-wide tracing setup.
 //!
-//! Stdout logging is always on. OpenTelemetry export (traces and logs over
-//! OTLP/HTTP) is added on top only when an endpoint is configured.
+//! Stdout logging is on unless the log format is `none`. OpenTelemetry export
+//! (traces and logs over OTLP/HTTP) is added on top only when an endpoint is
+//! configured.
 
 mod otlp;
 
@@ -68,18 +69,22 @@ impl Telemetry {
         }
     }
 
-    fn stdout_layer<S>(config: &Config) -> Result<Box<dyn Layer<S> + Send + Sync>>
+    /// The stdout logging layer, or `None` when stdout logging is off.
+    fn stdout_layer<S>(config: &Config) -> Result<Option<Box<dyn Layer<S> + Send + Sync>>>
     where
         S: Subscriber + for<'a> LookupSpan<'a>,
     {
         let filter = Self::log_filter(&config.log_level)?;
         Ok(match config.log_format {
-            LogFormat::Text => fmt::layer().with_filter(filter).boxed(),
-            LogFormat::Json => fmt::layer()
-                .json()
-                .flatten_event(true)
-                .with_filter(filter)
-                .boxed(),
+            LogFormat::Text => Some(fmt::layer().with_filter(filter).boxed()),
+            LogFormat::Json => Some(
+                fmt::layer()
+                    .json()
+                    .flatten_event(true)
+                    .with_filter(filter)
+                    .boxed(),
+            ),
+            LogFormat::None => None,
         })
     }
 

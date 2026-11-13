@@ -598,6 +598,21 @@ fn missing_root_fails_at_startup() {
     assert!(!output.status.success());
 }
 
+#[test]
+fn log_format_none_still_reports_fatal_errors_on_stderr() {
+    let tmp = TempDir::new().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_aphid-server"))
+        .arg("--root")
+        .arg(tmp.path().join("nope"))
+        .args(["--port", "0", "--log-format", "none"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty(), "{output:?}");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.starts_with("aphid-server: "), "{stderr}");
+}
+
 #[cfg(unix)]
 #[test]
 fn graceful_shutdown_finishes_in_flight_requests() {
