@@ -2,8 +2,8 @@ name: Docs
 
 # Builds https://aphid.lhelge.se with aphid, packs it into an aphid-server image
 # (docs/Dockerfile), pushes ghcr.io/lhelge/aphid-docs and deploys its digest to
-# hoster through the OIDC-authenticated deploy webhook. The stack file is
-# docs/hoster/aphid-docs.stack.toml.
+# hoster with hoster's deploy action (OIDC-authenticated, no secret). The
+# stack file is docs/hoster/aphid-docs.stack.toml.
 #
 # Runs from release.yml on every release tag (after the aphid-server image of
 # that release is published), or by hand from main.
@@ -17,8 +17,6 @@ env:
   IMAGE: ghcr.io/lhelge/aphid-docs
   STACK: aphid-docs
   SERVICE: web
-  HOSTER_URL: https://hoster.lhelge.se/hooks/deploy
-  HOSTER_AUDIENCE: https://hoster.lhelge.se
 
 concurrency:
   group: docs-deploy
@@ -82,30 +80,13 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      # See https://docs.hoster.lhelge.se/wiki/deploying-from-ci/. The token is
-      # single-use: never retry the POST with the same one.
+      # See https://docs.hoster.lhelge.se/wiki/deploying-from-ci/. The action
+      # requests a fresh OIDC token per attempt and links the deployment in the
+      # step summary.
       - name: Deploy to hoster
-        env:
-          DIGEST: ${{ steps.push.outputs.digest }}
-        run: |
-          set -euo pipefail
-          audience=$(jq -rn --arg a "$HOSTER_AUDIENCE" '$a|@uri')
-          token=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$audience" | jq -r .value)
-          echo "::add-mask::$token"
-
-          body=$(jq -nc --arg s "$STACK" --arg svc "$SERVICE" --arg d "$DIGEST" \
-            --arg t "$GITHUB_REF_NAME@${GITHUB_SHA::7}" '{stack:$s, images:{($svc):$d}, tag:$t}')
-          echo "request: $body"
-          status=$(curl -sS -o response.json -w '%{http_code}' -X POST "$HOSTER_URL" \
-            -H 'Content-Type: application/json' \
-            -H "Authorization: Bearer $token" \
-            --data "$body")
-          echo "response ($status): $(cat response.json)"
-          case "$status" in
-            200|202) ;;
-            *) echo "::error::hoster refused the deploy ($status): $(cat response.json)"; exit 1 ;;
-          esac
-
-          id=$(jq -r .deployment_id response.json)
-          echo "Deployment: ${HOSTER_URL%/hooks/deploy}/stacks/$STACK/deployments/$id" >> "$GITHUB_STEP_SUMMARY"
+        uses: LHelge/hoster/actions/deploy@09c825566317517bb242934505d45ef2f2e91cc5 # main, ahead of v0.8.0
+        with:
+          url: https://hoster.lhelge.se
+          stack: ${{ env.STACK }}
+          images: |
+            ${{ env.SERVICE }}=${{ steps.push.outputs.digest }}
