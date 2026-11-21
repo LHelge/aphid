@@ -280,6 +280,21 @@ these classes. Key token classes:
 Wrap code blocks in a container with `overflow-x: auto` for horizontal scrolling. Use a
 monospace font and a background color that contrasts with the page.
 
+## Inlined SVG images
+
+Content can inline SVG files with `![alt](/static/x.svg#inline "caption")`. The markup lands
+in the page as `<figure class="inline-svg"><svg …>…</svg><figcaption>…</figcaption></figure>`
+(or `<span class="inline-svg">` when the image sits inside running text), so theme CSS can
+reach into the drawing. The root `<svg>` keeps its own attributes (`class`, `viewBox`, …).
+Give it a responsive size, and style drawing parts through their classes:
+
+```css
+.inline-svg svg { max-width: 100%; height: auto; }
+.inline-svg figcaption { font-size: 0.9em; text-align: center; }
+```
+
+In `aphid serve`, an SVG that can't be inlined renders as `<span class="inline-svg broken">`.
+
 ## Mermaid diagrams
 
 When `contains_mermaid` is true, the template should load `/static/js/mermaid.min.js`

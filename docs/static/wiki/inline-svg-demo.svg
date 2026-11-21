@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="demo-wiring" viewBox="0 0 240 80" width="240" height="80">
+  <defs>
+    <marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0L10 5L0 10z" class="tip"/>
+    </marker>
+  </defs>
+  <rect class="box" x="4" y="20" width="56" height="40" rx="6"/>
+  <rect class="box" x="180" y="20" width="56" height="40" rx="6"/>
+  <text class="label" x="32" y="45">A</text>
+  <text class="label" x="208" y="45">B</text>
+  <line class="wire" data-color="red" stroke="red" x1="60" y1="32" x2="178" y2="32" marker-end="url(#tip)"/>
+  <line class="wire" data-color="blue" stroke="blue" x1="60" y1="48" x2="178" y2="48" marker-end="url(#tip)"/>
+</svg>

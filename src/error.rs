@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
-use crate::markdown::BrokenWikiLink;
+use crate::markdown::Diagnostics;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -36,8 +36,10 @@ pub enum Error {
     ThemeMissingTemplates { missing: Vec<String> },
     #[error("template render error: {0}")]
     Tera(#[from] tera::Error),
-    #[error("broken wiki-links found:\n{}", format_broken_links(.0))]
-    BrokenWikiLinks(Vec<BrokenWikiLink>),
+    /// Pass-1 problems that `build` treats as fatal: broken wiki-links and
+    /// SVG images that could not be inlined.
+    #[error("{0}")]
+    Diagnostics(Diagnostics),
     #[error("file watcher error: {0}")]
     Notify(#[from] notify::Error),
     #[error("refusing unsafe path '{}': {reason}", path.display())]
@@ -53,17 +55,4 @@ pub enum Error {
     Scaffold { message: String },
     #[error("failed to generate favicon from '{}': {reason}", path.display())]
     Favicon { path: PathBuf, reason: String },
-}
-
-fn format_broken_links(links: &[BrokenWikiLink]) -> String {
-    links
-        .iter()
-        .map(|link| {
-            format!(
-                "  - page \"{}\" references missing wiki-link: \"{}\"",
-                link.source, link.target
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
 }

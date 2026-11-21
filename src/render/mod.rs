@@ -21,7 +21,7 @@ use crate::markdown::{Diagnostics, MarkdownRenderer, RenderedSite};
 ///
 /// Carries diagnostics from pass 1 (markdown rendering) alongside the
 /// output artifacts. Callers decide what to do with the diagnostics:
-/// [`crate::build`] turns broken wiki-links into an error, the dev server
+/// [`crate::build`] turns them into an error, the dev server
 /// logs them as warnings and serves the pages anyway.
 pub struct BuiltSite {
     /// URL path -> rendered HTML (e.g. "/blog/hello/" -> "<html>...</html>")
