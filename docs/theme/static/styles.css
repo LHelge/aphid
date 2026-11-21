@@ -1722,3 +1722,48 @@ a:hover {
     text-align: left;
   }
 }
+/* Inlined SVG images */
+.inline-svg {
+  margin: 1.5rem 0;
+  text-align: center;
+}
+
+.inline-svg svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.inline-svg figcaption {
+  margin-top: 0.5rem;
+  font-size: 0.9em;
+  opacity: 0.8;
+}
+
+/* Demo drawing on the markdown wiki page: themed from here, not the file. */
+.demo-wiring .box {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.demo-wiring .label {
+  fill: currentColor;
+  font: 600 16px sans-serif;
+  text-anchor: middle;
+}
+
+.demo-wiring .wire {
+  stroke-width: 3;
+}
+
+.demo-wiring .wire[data-color="red"] {
+  stroke: #f38ba8;
+}
+
+.demo-wiring .wire[data-color="blue"] {
+  stroke: #89b4fa;
+}
+
+.demo-wiring .tip {
+  fill: currentColor;
+}

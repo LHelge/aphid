@@ -3,7 +3,7 @@ use crate::content::{
     WikiIntroPage,
 };
 
-use super::Rendered;
+use super::{InlineSvgProblem, Rendered};
 
 /// The site with every page body run through the markdown pipeline, joined
 /// to the page it came from.
@@ -92,17 +92,30 @@ impl<'a> RenderedSite<'a> {
     }
 }
 
-/// Build-time signals collected during pass 1. Today this is only broken
-/// wiki-links; future passes (orphan pages, missing image refs, etc.) can
-/// extend this without changing the renderer's interface.
+/// Build-time signals collected during pass 1: broken wiki-links and
+/// images marked for SVG inlining that couldn't be inlined. Future passes
+/// (orphan pages, etc.) can extend this without changing the renderer's
+/// interface.
 #[derive(Debug, Clone, Default)]
 pub struct Diagnostics {
     pub broken_wiki_links: Vec<BrokenWikiLink>,
+    pub broken_inline_svgs: Vec<BrokenInlineSvg>,
 }
 
 impl Diagnostics {
     pub fn is_empty(&self) -> bool {
-        self.broken_wiki_links.is_empty()
+        self.broken_wiki_links.is_empty() && self.broken_inline_svgs.is_empty()
+    }
+
+    /// The `build` policy: any diagnostic is fatal. Returns
+    /// [`Error::Diagnostics`](crate::Error::Diagnostics) listing every
+    /// problem, so one run reports them all.
+    pub fn ensure_clean(&self) -> Result<(), crate::Error> {
+        if self.is_empty() {
+            Ok(())
+        } else {
+            Err(crate::Error::Diagnostics(self.clone()))
+        }
     }
 
     fn collect(
@@ -114,6 +127,22 @@ impl Diagnostics {
         wiki_intro: Option<&(&WikiIntroPage, Rendered)>,
     ) -> Self {
         let mut broken_wiki_links = Vec::new();
+        let mut broken_inline_svgs = Vec::new();
+        let mut record = |source: DiagnosticSource, rendered: &Rendered| {
+            for target in &rendered.broken_wiki_links {
+                broken_wiki_links.push(BrokenWikiLink {
+                    source: source.clone(),
+                    target: target.clone(),
+                });
+            }
+            for error in &rendered.inline_svg_errors {
+                broken_inline_svgs.push(BrokenInlineSvg {
+                    source: source.clone(),
+                    src: error.src.clone(),
+                    problem: error.problem.clone(),
+                });
+            }
+        };
 
         let from_pages = blog
             .iter()
@@ -129,12 +158,7 @@ impl Diagnostics {
             );
 
         for (source, rendered) in from_pages {
-            for target in &rendered.broken_wiki_links {
-                broken_wiki_links.push(BrokenWikiLink {
-                    source: source.clone(),
-                    target: target.clone(),
-                });
-            }
+            record(source, rendered);
         }
 
         for (source, rendered) in [
@@ -145,16 +169,48 @@ impl Diagnostics {
         .into_iter()
         .flatten()
         {
-            for target in &rendered.broken_wiki_links {
-                broken_wiki_links.push(BrokenWikiLink {
-                    source: source.clone(),
-                    target: target.clone(),
-                });
-            }
+            record(source, rendered);
         }
 
-        Self { broken_wiki_links }
+        Self {
+            broken_wiki_links,
+            broken_inline_svgs,
+        }
     }
+}
+
+impl std::fmt::Display for Diagnostics {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut sections = Vec::new();
+        if !self.broken_wiki_links.is_empty() {
+            sections.push("broken wiki-links found:".to_owned());
+            for link in &self.broken_wiki_links {
+                sections.push(format!(
+                    "  - page \"{}\" references missing wiki-link: \"{}\"",
+                    link.source, link.target
+                ));
+            }
+        }
+        if !self.broken_inline_svgs.is_empty() {
+            sections.push("SVG images could not be inlined:".to_owned());
+            for svg in &self.broken_inline_svgs {
+                sections.push(format!(
+                    "  - page \"{}\" inlines \"{}\": {}",
+                    svg.source, svg.src, svg.problem
+                ));
+            }
+        }
+        write!(f, "{}", sections.join("\n"))
+    }
+}
+
+/// One `#inline` SVG image found during pass 1 that couldn't be inlined.
+#[derive(Debug, Clone)]
+pub struct BrokenInlineSvg {
+    pub source: DiagnosticSource,
+    /// The image URL as written in the page.
+    pub src: String,
+    pub problem: InlineSvgProblem,
 }
 
 /// One unresolved `[[wiki-link]]` found during pass 1.

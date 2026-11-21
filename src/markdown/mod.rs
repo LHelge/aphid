@@ -2,6 +2,7 @@ pub mod alerts;
 pub mod anchors;
 pub mod external_links;
 pub mod highlight;
+pub mod inline_svg;
 pub mod relative_urls;
 pub mod rendered;
 pub mod wikilinks;
@@ -10,8 +11,9 @@ pub use alerts::rewrite_alerts;
 pub use anchors::{HeadingEntry, inject_heading_ids};
 pub use external_links::rewrite_external_links;
 pub use highlight::Highlighter;
+pub use inline_svg::{InlineSvgError, InlineSvgProblem, SvgInliner};
 pub use relative_urls::rewrite_relative_urls;
-pub use rendered::{BrokenWikiLink, DiagnosticSource, Diagnostics, RenderedSite};
+pub use rendered::{BrokenInlineSvg, BrokenWikiLink, DiagnosticSource, Diagnostics, RenderedSite};
 pub use wikilinks::{WikiLinkRef, extract_wiki_links, rewrite_wiki_links};
 
 use std::sync::LazyLock;
@@ -59,6 +61,9 @@ pub struct Rendered {
     /// `build` mode treats these as fatal; `serve` mode logs them and
     /// continues so writing isn't blocked.
     pub broken_wiki_links: Vec<String>,
+    /// Images marked `#inline` that could not be inlined. Fatal in
+    /// `build`, warnings in `serve` (like broken wiki-links).
+    pub inline_svg_errors: Vec<InlineSvgError>,
     /// Whether the body contains at least one ` ```mermaid ` block. Used by
     /// the template layer to load the Mermaid runtime only on pages that
     /// need it.
@@ -86,6 +91,7 @@ impl Rendered {
 pub struct MarkdownRenderer<'a> {
     pub(crate) site: &'a Site,
     highlighter: Highlighter,
+    svg_inliner: SvgInliner,
 }
 
 impl<'a> MarkdownRenderer<'a> {
@@ -93,6 +99,7 @@ impl<'a> MarkdownRenderer<'a> {
         Self {
             site,
             highlighter: Highlighter::new(),
+            svg_inliner: SvgInliner::new(&site.config),
         }
     }
 
@@ -103,6 +110,7 @@ impl<'a> MarkdownRenderer<'a> {
         let events: Vec<_> = Parser::new_ext(body, markdown_options()).collect();
 
         let events = rewrite_relative_urls(events);
+        let (events, inline_svg_errors) = self.svg_inliner.transform(events, body);
         let (events, broken_wiki_links) = rewrite_wiki_links(events, self.site);
         let events = rewrite_external_links(events, &self.site.config.base_url);
         let events = rewrite_alerts(events);
@@ -113,6 +121,7 @@ impl<'a> MarkdownRenderer<'a> {
             html: render_html(events),
             toc,
             broken_wiki_links,
+            inline_svg_errors,
             contains_mermaid,
         }
     }
@@ -178,6 +187,7 @@ mod tests {
             html: html.to_owned(),
             toc: vec![],
             broken_wiki_links: vec![],
+            inline_svg_errors: vec![],
             contains_mermaid: false,
         }
     }

@@ -242,6 +242,10 @@ Reference theme assets with an absolute path in templates:
 
 Code blocks are highlighted with CSS classes prefixed `hl-` (e.g. `hl-keyword`, `hl-string`, `hl-comment`). Your theme stylesheet must provide rules for these classes — otherwise code blocks will render in a single color. The default theme ships with [Catppuccin Mocha](https://catppuccin.com/) colors as a reference.
 
+## Inlined SVG images
+
+SVG images that content marks with `#inline` are put into the page as markup inside `<figure class="inline-svg">` (or `<span class="inline-svg">` inside running text), with an optional `<figcaption>`. Your stylesheet can size them and style the drawing's own classes. See [[markdown#inline-svg-images]] for the markup and an example.
+
 ## Mermaid diagrams
 
 ` ```mermaid ` fenced blocks are emitted as `<pre class="mermaid">…</pre>` — they need a client-side runtime to render. `aphid` bundles `mermaid.min.js` and writes it to `/static/js/mermaid.min.js` on every build, but **loading and initialising it is the theme's responsibility**: `base.html` must include the script and call `mermaid.initialize(...)` so a theme without diagram support can skip the payload entirely.

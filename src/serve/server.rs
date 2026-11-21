@@ -223,6 +223,14 @@ pub(crate) fn log_diagnostics(built: &BuiltSite) {
             "broken wiki-link",
         );
     }
+    for svg in &built.diagnostics.broken_inline_svgs {
+        tracing::warn!(
+            page = %svg.source,
+            src = %svg.src,
+            problem = %svg.problem,
+            "SVG image could not be inlined",
+        );
+    }
 }
 
 #[cfg(test)]

@@ -21,6 +21,7 @@ These work out of the box:
 | `Inline code` | `` `code` `` |
 | [Link](https://example.com) | `[text](url)` |
 | Image | `![alt](url)` |
+| Inline SVG | `![alt](/static/x.svg#inline)` — see [[#inline-svg-images]] |
 | Blockquote | `> text` |
 | Unordered list | `- item` or `* item` |
 | Ordered list | `1. item` |
@@ -143,6 +144,84 @@ Here is a rendered example using an image from the wiki's static directory:
 ![A cute aphid](/static/wiki/cute_aphid.png)
 
 The build step copies `static_dir` into the output's `static/` directory, so the same path works in both serve and build modes. Theme static files are merged into the same `/static/` namespace — see [[themes]] for precedence rules.
+
+# Inline SVG images
+
+An SVG loaded through `<img>` is a separate document: the page's CSS can't reach into it. That matters for drawings that are generated without built-in styles and meant to be styled by the host page, such as wiring diagrams that only carry classes and `data-*` hooks. To put an SVG's markup into the page itself, add `#inline` to the image URL:
+
+```markdown
+![Wiring diagram for the A harness](/static/drawings/harness-a.svg#inline "The A harness")
+```
+
+aphid reads the file at build time and replaces the image with its markup:
+
+```html
+<figure class="inline-svg">
+  <svg class="wirebug" viewBox="…" role="img" aria-label="Wiring diagram for the A harness">…</svg>
+  <figcaption>The A harness</figcaption>
+</figure>
+```
+
+Without `#inline`, an SVG stays a normal `<img>`, so icons and logos don't change. Plain CommonMark viewers such as GitHub ignore the fragment and show the file as an ordinary image.
+
+## What the output looks like
+
+- **Accessible name.** The alt text becomes `role="img"` plus `aria-label` on the root `<svg>`. An empty alt text (`![](…#inline)`) marks the drawing as decorative with `aria-hidden="true"`. Any `role` / `aria-label` / `aria-labelledby` / `aria-hidden` on the file's root element is replaced.
+- **Caption.** The image title (the quoted part) becomes a `<figcaption>`. No title, no caption.
+- **Running text.** A `<figure>` can't sit inside a paragraph, so an image that shares its paragraph with text (or a link) is wrapped in `<span class="inline-svg">` instead, without a caption. Put the image on its own line to get the figure.
+- **Cleanup.** The XML prolog, doctype, comments and processing instructions are removed. The root `<svg>` attributes, including `class`, `viewBox`, `width` and `height`, are kept as they are, so your CSS can target them.
+
+## Ids are prefixed
+
+Several drawings on one page, or the same drawing twice, would otherwise define the same `id`s, and a `url(#gradient)` in one drawing would pick up another drawing's gradient. aphid gives every inlined SVG its own prefix (for example `svg1a2b3c4d-1-`) and rewrites:
+
+- every `id` attribute,
+- `url(#…)` references in attributes (`fill`, `clip-path`, `marker-end`, `style`, …) and inside `<style>` elements,
+- `href="#…"` and `xlink:href="#…"`,
+- `aria-labelledby` and `aria-describedby`.
+
+Only references to ids defined in the same file are touched. Not rewritten: `#id` CSS selectors inside the file's own `<style>`, and SMIL timing references such as `begin="other.end"`. Style drawings through **classes**, not ids — ids aren't stable.
+
+## Paths and errors
+
+The path is resolved the same way the browser would resolve the URL: `/static/…` maps to your `static_dir` first, then the theme's `static/`. A relative path such as `static/x.svg` is treated as site-root-relative, like every other image URL. Only `.svg` files under `/static/` can be inlined. Remote URLs are never fetched, and paths that leave the static directory (`..` segments or symlinks pointing outside it) are rejected.
+
+A missing file, a file that isn't well-formed SVG (its root element must be `<svg>`), or any of the rejected paths above fails `aphid build`, naming the page and the path:
+
+```text
+SVG images could not be inlined:
+  - page "wiring" inlines "/static/drawings/harness-a.svg": file not found
+```
+
+`aphid serve` logs the same problem as a warning and shows the alt text in a `<span class="inline-svg broken">` so you can keep writing. When an SVG under the static directory changes on disk — for example because a generator rewrote it — the dev server rebuilds and reloads the page.
+
+The file is still copied into `dist/static/` as usual, so links to it keep working.
+
+> [!WARNING]
+> Inlined SVG is part of your page, so any `<script>` or event-handler attributes in the file run on your site. That's the same trust level as raw HTML in markdown. Only inline files you trust.
+
+## Styling an inlined SVG
+
+Size the drawing responsively and style its parts through their classes from your theme stylesheet:
+
+```css
+.inline-svg svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.wirebug .wire {
+  stroke-width: 3;
+}
+
+.wirebug .wire[data-color="red"] {
+  stroke: #f38ba8;
+}
+```
+
+Here is a live example. The file has no colours or fonts of its own. The boxes, labels and wire colours all come from this site's stylesheet:
+
+![Two boxes, A and B, joined by a red and a blue wire](/static/wiki/inline-svg-demo.svg#inline "Styled by the docs theme")
 
 # Extensions
 

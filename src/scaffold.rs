@@ -298,11 +298,7 @@ default home page layout.
         let config = Config::from_path(&config_path)?;
         let theme = Theme::load(&config)?;
         let built = BuiltSite::build(&config, &theme)?;
-        if !built.diagnostics.is_empty() {
-            return Err(Error::BrokenWikiLinks(
-                built.diagnostics.broken_wiki_links.clone(),
-            ));
-        }
+        built.diagnostics.ensure_clean()?;
         let writer = OutputWriter::new(&output_dir)?;
         writer.write(&built, &theme, &config.static_dir)?;
         Ok(())

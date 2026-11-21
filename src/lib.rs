@@ -73,9 +73,9 @@ impl BuildOptions {
 /// Build the site into the given output directory, with default
 /// [`BuildOptions`].
 ///
-/// Broken `[[wiki-links]]` are fatal here: any diagnostics produced during
-/// pass 1 are converted into [`Error::BrokenWikiLinks`] before any output
-/// is written. The dev server applies a different policy — see
+/// Broken `[[wiki-links]]` and SVG images that can't be inlined are fatal
+/// here: any diagnostics produced during pass 1 are converted into
+/// [`Error::Diagnostics`] before any output is written. The dev server applies a different policy — see
 /// [`serve`].
 pub async fn build(config_path: &Path, output_dir: &Path) -> Result<(), Error> {
     build_with(config_path, output_dir, BuildOptions::default()).await
@@ -92,11 +92,7 @@ pub async fn build_with(
     let theme = Theme::load(&config)?;
     let built = BuiltSite::build(&config, &theme)?;
 
-    if !built.diagnostics.is_empty() {
-        return Err(Error::BrokenWikiLinks(
-            built.diagnostics.broken_wiki_links.clone(),
-        ));
-    }
+    built.diagnostics.ensure_clean()?;
 
     // ── Write output ────────────────────────────────────────────────────────
     tracing::info!(output = %output_dir.display(), "writing output");

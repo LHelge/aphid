@@ -120,6 +120,13 @@ Place files in `static/` and reference them with absolute paths:
 `![alt](/static/images/photo.png)`. The user `static/` directory wins over theme static
 files of the same path.
 
+To put an SVG's markup directly into the page (so theme CSS can style it), add `#inline`
+to the URL: `![Wiring diagram](/static/drawings/harness.svg#inline "Optional caption")`.
+The alt text becomes the SVG's accessible name and the title becomes a `<figcaption>`.
+Only `.svg` files under `/static/` can be inlined; a missing or invalid file fails
+`aphid build`. Without `#inline`, an SVG stays a normal `<img>`. Style inlined drawings
+through classes, not ids — aphid prefixes every id per instance.
+
 ## Supported markdown extensions
 
 - Tables, strikethrough (`~~text~~`), task lists (`- [x]`), footnotes (`[^1]`).

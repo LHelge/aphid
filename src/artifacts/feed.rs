@@ -342,6 +342,7 @@ mod tests {
             html: content.into(),
             toc: vec![],
             broken_wiki_links: vec![],
+            inline_svg_errors: vec![],
             contains_mermaid: false,
         }
     }

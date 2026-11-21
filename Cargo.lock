@@ -128,6 +128,7 @@ dependencies = [
  "image",
  "insta",
  "notify",
+ "percent-encoding",
  "pulldown-cmark",
  "quick-xml",
  "rayon",
